@@ -1,0 +1,6 @@
+@MojePwa.Server_HostAddress = http://localhost:5275
+
+GET {{MojePwa.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

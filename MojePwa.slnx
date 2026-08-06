@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MojePwa.Client/MojePwa.Client.csproj" />
+  <Project Path="MojePwa.Server/MojePwa.Server.csproj" />
+</Solution>
