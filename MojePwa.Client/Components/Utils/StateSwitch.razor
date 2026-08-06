@@ -1,0 +1,82 @@
+﻿@typeparam TData
+
+@switch (State)
+{
+    case StateLoading loading:
+        @if (LoadingContent is not null)
+        {
+            @LoadingContent(loading)
+        }
+        else
+        {
+            <!-- Defaultní Loading vzhled -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" ShowValue="false" />
+                @if (!string.IsNullOrWhiteSpace(loading.Message))
+                {
+                    <RadzenText class="rz-mb-0">@loading.Message</RadzenText>
+                }
+            </RadzenStack>
+        }
+        break;
+
+    case StateLoaded<TData> loaded:
+        @if (ChildContent is not null)
+        {
+            @ChildContent(loaded.LoadedData)
+        }
+        @if (loaded.IsReloading)
+        {
+            <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Value="100" ShowValue="false" class="rz-mb-2" Style="height: 4px" />
+        }
+        break;
+
+    case StateError err:
+        @if (ErrorContent is not null)
+        {
+            @ErrorContent(err)
+        }
+        else
+        {
+            <!-- Defaultní Error vzhled -->
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                @foreach (var error in err.Errors)
+                {
+                    <RadzenText class="text-danger rz-mb-0">@error</RadzenText>
+                }
+
+                @if (err.ShowRetryButton && OnRetry.HasDelegate)
+                {
+                    <RadzenButton Text="Zkusit znovu" Icon="refresh" Size="ButtonSize.Small" Variant="Variant.Flat"
+                                  Click="@(() => OnRetry.InvokeAsync())" />
+                }
+            </RadzenStack>
+        }
+        break;
+
+    case null:
+        break;
+
+    case object o when o.GetType().IsGenericType
+                             && o.GetType().GetGenericTypeDefinition() == typeof(StateLoaded<>)
+                             && o.GetType() != typeof(StateLoaded<TData>):
+        <RadzenText class="text-danger">Načtená data mají neočekávaný typ</RadzenText>
+        break;
+
+    default:
+        <RadzenText class="text-danger">Neznámý stav GUI</RadzenText>
+        break;
+}
+
+@code {
+    [Parameter] public IGuiState? State { get; set; }
+
+    // Povinný/hlavní obsah pro Loaded stav (přijímá načtená data)
+    [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
+
+    // Nepovinné šablony pro vlastní vzhled (přijímají daný stav jako kontext)
+    [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
+    [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
+
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

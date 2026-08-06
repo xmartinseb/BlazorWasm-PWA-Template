@@ -1,10 +1,51 @@
 ﻿@page "/weather"
-@inject HttpClient Http
+@inject IWeatherService WeatherService
+@inherits ComponentWithGuiState<Weather.ViewModel>
 
 <PageTitle>Weather</PageTitle>
 
 <h1>Weather</h1>
 
+<StateSwitch TData="ViewModel" State="GuiState" Context="vm">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th aria-label="Temperature in Celsius">Temp. (C)</th>
+                <th aria-label="Temperature in Fahrenheit">Temp. (F)</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in vm.Forecasts)
+            {
+                <tr>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                    <td>@forecast.Summary</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</StateSwitch>
+
+@code {
+    protected override Task OnInitializedAsync() => LoadAndSetGuiStateAsync();
+
+    protected override string LoadingMessage { get; set; } = "Načítám předpověď počasí...";
+
+    protected override async Task<Result<ViewModel>> LoadDataAsync()
+    {
+        await Task.Delay(2000, CT.None); // Fake delay (GUI test)
+        var forecasts = (await WeatherService.GetForecastAsync(CT.None)).Unwrap();
+        return Result.Ok(new ViewModel(forecasts));
+    }
+
+    public sealed record ViewModel(WeatherForecast[] Forecasts);
+}
+
+@* 
 <p>This component demonstrates fetching data from the server.</p>
 
 @if (forecasts == null)
@@ -55,3 +96,4 @@ else
         public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
     }
 }
+ *@

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MojePwa.Client\MojePwa.Client.csproj" />
+    <ProjectReference Include="..\MojePwa.Domain\MojePwa.Domain.csproj" />
   </ItemGroup>
 
 </Project>
