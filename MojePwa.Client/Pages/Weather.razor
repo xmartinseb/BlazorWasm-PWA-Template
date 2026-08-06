@@ -1,13 +1,10 @@
 ﻿@* This component demonstrates fetching data from the server via services *@
 @page "/weather"
 @inject IWeatherService WeatherService
-@inherits ComponentWithGuiState<Weather.ViewModel>
 
-<PageTitle>Weather</PageTitle>
+<PeriodicCachedDownloader TData="ViewModel" Context="vm" CacheKey="weather_forecasts" 
+    LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)">
 
-<h1>Weather</h1>
-
-<StateSwitch TData="ViewModel" State="GuiState" Context="vm">
     <table class="table">
         <thead>
             <tr>
@@ -29,19 +26,15 @@
             }
         </tbody>
     </table>
-</StateSwitch>
+</PeriodicCachedDownloader>
 
 @code {
-    protected override Task OnInitializedAsync() => LoadAndSetGuiStateAsync();
-
-    protected override string LoadingMessage { get; set; } = "Načítám předpověď počasí...";
-
-    protected override async Task<Result<ViewModel>> LoadDataAsync()
+    async Task<Result<ViewModel>> LoadFreshData()
     {
-        await Task.Delay(2000, CT.None); // Fake delay (GUI test)
+        await Task.Delay(200, CT.None); // Fake delay (GUI test)
         var forecasts = (await WeatherService.GetForecastAsync(CT.None)).Unwrap();
         return Result.Ok(new ViewModel(forecasts));
     }
 
     public sealed record ViewModel(WeatherForecast[] Forecasts);
-}
+} 

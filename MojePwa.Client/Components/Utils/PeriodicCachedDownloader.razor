@@ -1,0 +1,142 @@
+﻿@typeparam TData
+@inherits ComponentWithGuiState<TData>
+@implements IDisposable
+@inject LocalTtlCache LocalTtlCache
+
+<StateSwitch TData="TData" Context="data" State="GuiState" ChildContent="ChildContent" LoadingContent="LoadingContent" 
+    ErrorContent="ErrorContent" OnRetry="OnRetry" />
+
+@code {
+    [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
+    [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
+    [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+
+    [Parameter] public string CacheKey { get; set; } = string.Empty;
+    [Parameter] public Func<Task<Result<TData>>> LoadFreshData { get; set; } = default!;
+    [Parameter] public TimeSpan DataReloadPeriod { get; set; } = TimeSpan.FromMinutes(1);
+
+    protected override string LoadingMessage { get; set; } = "Načítání dat...";
+
+    CancellationTokenSource? _cts;
+    readonly SemaphoreSlim _reloadLock = new(1, 1);
+    string _previousCacheKey = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Spustíme inicializaci a timer pouze pokud se změnil CacheKey nebo poprvé
+        if (_previousCacheKey != CacheKey)
+        {
+            _previousCacheKey = CacheKey;
+
+            await LoadAndSetGuiStateAsync();
+            StartPeriodicReload();
+        }
+    }
+
+    void StartPeriodicReload()
+    {
+        // Zrušíme předchozí běh timeru, pokud běžel
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+
+        var token = _cts.Token;
+
+        // Spustíme asynchronní smyčku na pozadí (PeriodicTimer je v .NET 6+ nejčistší řešení)
+        _ = Task.Run(async () =>
+        {
+            using var periodicTimer = new PeriodicTimer(DataReloadPeriod);
+
+            try
+            {
+                while (await periodicTimer.WaitForNextTickAsync(token))
+                {
+                    await PerformBackgroundReloadAsync(token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignorujeme při zrušení (Dispose / Změna parametrů)
+            }
+        }, token);
+    }
+
+    async Task PerformBackgroundReloadAsync(CancellationToken cancellationToken)
+    {
+        if (!await _reloadLock.WaitAsync(0, cancellationToken))
+            return;
+
+        try
+        {
+            if (GuiState is not StateLoaded<TData> loaded)
+                return;
+
+            // Bezpečné překlopení UI stavu přes InvokeAsync
+            await InvokeAsync(() =>
+            {
+                loaded.IsReloading = true;
+                StateHasChanged();
+            });
+
+            var fresh = await LoadFreshData();
+
+            await InvokeAsync(async () =>
+            {
+                if (fresh.Succeeded)
+                {
+                    loaded.LoadedData = fresh.Value;
+                    await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
+                }
+                else
+                {
+                    GuiState = new StateError(fresh.Errors);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            // Zde zachytíme případné chyby z načítání na pozadí
+            await InvokeAsync(() => GuiState = new StateError("Unexpected error occurred"));
+        }
+        finally
+        {
+            if (GuiState is StateLoaded<TData> loadedAfter)
+            {
+                await InvokeAsync(() =>
+                {
+                    loadedAfter.IsReloading = false;
+                    StateHasChanged();
+                });
+            }
+
+            _reloadLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Volá se automaticky pod LoadAndSetGuiStateAsync POUZE při prvnim načtení komponenty
+    /// </summary>
+    /// <returns>Výsledek, který přepne komponentu do nového stavu</returns>
+    protected override async Task<Result<TData>> LoadDataAsync()
+    {
+        if (!string.IsNullOrEmpty(CacheKey))
+        {
+            var cached = await LocalTtlCache.TryGetAsync<TData>(CacheKey);
+            if (cached.Succeeded)
+                return cached;
+        }
+
+        var fresh = await LoadFreshData();
+        if (fresh.Succeeded)
+            await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
+        return fresh;
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _reloadLock.Dispose();
+    }
+}
