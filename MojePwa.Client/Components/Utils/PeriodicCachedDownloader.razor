@@ -1,10 +1,16 @@
 ﻿@typeparam TData
-@inherits ComponentWithGuiState<TData>
+@inherits ComponentWithGuiState<PeriodicCachedDownloader<TData>.LoadedData>
 @implements IDisposable
-@inject LocalTtlCache LocalTtlCache
+@inject BrowserTtlCache LocalTtlCache
 
-<StateSwitch TData="TData" Context="data" State="GuiState" ChildContent="ChildContent" LoadingContent="LoadingContent" 
-    ErrorContent="ErrorContent" OnRetry="OnRetry" />
+<StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent" 
+    ErrorContent="ErrorContent" OnRetry="OnRetry">
+
+    @ChildContent?.Invoke(data.Data)
+    <div>
+        <b>Čas načtení: </b> @data.LoadedUtc.ToLocalTime().ToString("HH:mm:ss")
+    </div>
+</StateSwitch>
 
 @code {
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
@@ -21,6 +27,12 @@
     CancellationTokenSource? _cts;
     readonly SemaphoreSlim _reloadLock = new(1, 1);
     string _previousCacheKey = string.Empty;
+
+    public class LoadedData
+    {
+        public required TData Data { get; set; }
+        public required DateTime LoadedUtc { get; set; }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -69,7 +81,7 @@
 
         try
         {
-            if (GuiState is not StateLoaded<TData> loaded)
+            if (GuiState is not StateLoaded<LoadedData> loaded)
                 return;
 
             // Bezpečné překlopení UI stavu přes InvokeAsync
@@ -85,7 +97,7 @@
             {
                 if (fresh.Succeeded)
                 {
-                    loaded.LoadedData = fresh.Value;
+                    loaded.LoadedData = new LoadedData { Data = fresh.Value, LoadedUtc = DateTime.UtcNow };
                     await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
                 }
                 else
@@ -101,7 +113,7 @@
         }
         finally
         {
-            if (GuiState is StateLoaded<TData> loadedAfter)
+            if (GuiState is StateLoaded<LoadedData> loadedAfter)
             {
                 await InvokeAsync(() =>
                 {
@@ -118,19 +130,19 @@
     /// Volá se automaticky pod LoadAndSetGuiStateAsync POUZE při prvnim načtení komponenty
     /// </summary>
     /// <returns>Výsledek, který přepne komponentu do nového stavu</returns>
-    protected override async Task<Result<TData>> LoadDataAsync()
+    protected override async Task<Result<LoadedData>> LoadDataAsync()
     {
         if (!string.IsNullOrEmpty(CacheKey))
         {
             var cached = await LocalTtlCache.TryGetAsync<TData>(CacheKey);
             if (cached.Succeeded)
-                return cached;
+                return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, LoadedUtc = cached.Value.StoredUtc });
         }
 
         var fresh = await LoadFreshData();
         if (fresh.Succeeded)
             await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
-        return fresh;
+        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, LoadedUtc = DateTime.UtcNow });
     }
 
     public void Dispose()
