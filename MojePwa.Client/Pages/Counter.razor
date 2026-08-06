@@ -1,4 +1,5 @@
 ﻿@page "/counter"
+@inject IJSRuntime JS
 
 <PageTitle>Counter</PageTitle>
 
@@ -10,9 +11,24 @@
 
 @code {
     private int currentCount = 0;
+    private const string StorageKey = "saved_counter_value";
 
-    private void IncrementCount()
+    protected override async Task OnInitializedAsync()
+    {
+        // Přečtení hodnoty z LocalStorage přes rodné JS API prohlížeče
+        var savedValue = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+
+        if (int.TryParse(savedValue, out var parsedCount))
+        {
+            currentCount = parsedCount;
+        }
+    }
+
+    private async Task IncrementCount()
     {
         currentCount++;
+
+        // Zápis do LocalStorage přes rodné JS API prohlížeče
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, currentCount.ToString());
     }
 }
