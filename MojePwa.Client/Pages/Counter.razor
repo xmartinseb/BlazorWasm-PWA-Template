@@ -1,5 +1,5 @@
 ﻿@page "/counter"
-@inject IJSRuntime JS
+@inject LocalStorage LocalStorage
 
 <PageTitle>Counter</PageTitle>
 
@@ -10,25 +10,12 @@
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
 @code {
-    private int currentCount = 0;
-    private const string StorageKey = "saved_counter_value";
+    int currentCount;
+    const string StorageKey = "saved_counter_value";
 
     protected override async Task OnInitializedAsync()
-    {
-        // Přečtení hodnoty z LocalStorage přes rodné JS API prohlížeče
-        var savedValue = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-
-        if (int.TryParse(savedValue, out var parsedCount))
-        {
-            currentCount = parsedCount;
-        }
-    }
+        => currentCount = await LocalStorage.GetAsync<int>(StorageKey);
 
     private async Task IncrementCount()
-    {
-        currentCount++;
-
-        // Zápis do LocalStorage přes rodné JS API prohlížeče
-        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, currentCount.ToString());
-    }
+        => await LocalStorage.SetAsync(StorageKey, ++currentCount);
 }
