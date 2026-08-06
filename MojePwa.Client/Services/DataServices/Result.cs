@@ -56,6 +56,9 @@ public sealed class Result<T> : Result
     /// <summary>Převede úspěšný výsledek na jiný typ; neúspěch se propaguje beze změny (bez výjimky).</summary>
     public Result<U> MapValue<U>(Func<T, U> conversion)
         => Succeeded ? new(conversion(Value!), true, Errors) : new(default, false, Errors);
+
+    internal T UnwrapOr(T fallbackValue)
+        => Succeeded ? Value : fallbackValue;
 }
 
 /// <summary>

@@ -1,36 +1,30 @@
 ﻿using Microsoft.JSInterop;
+using MojePwa.Client.Services.DataServices;
 using System.Text.Json;
 
 namespace MojePwa.Client.Services.Browser;
 
 public sealed class LocalStorage(IJSRuntime js)
 {
-    public ValueTask SetAsync(string key, string value)
-        => js.InvokeVoidAsync("localStorage.setItem", key, value);
-
     public ValueTask SetAsync<T>(string key, T value)
         => js.InvokeVoidAsync("localStorage.setItem", key, JsonSerializer.Serialize(value));
 
-    public ValueTask<string?> GetAsync(string key)
-        => js.InvokeAsync<string?>("localStorage.getItem", key);
-
-    public async Task<T?> GetAsync<T>(string key)
+    public async Task<Result<T>> TryGetAsync<T>(string key)
     {
-        var json = await js.InvokeAsync<string?>("localStorage.getItem", key);
-
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return default;
-        }
+        if (await js.InvokeAsync<string?>("localStorage.getItem", key) is not string json)
+            return Result.Err<T>("Key not found");
 
         try
         {
-            return JsonSerializer.Deserialize<T>(json);
+            return JsonSerializer.Deserialize<T>(json) switch
+            {
+                null => Result.Err<T>("Cannot deserialize NULL"),
+                var obj => Result.Ok(obj)
+            };
         }
-        catch (JsonException)
+        catch
         {
-            // Pokud jsou data poškozená, je bezpečnější vrátit default (nebo klíč promazat)
-            return default;
+            return Result.Err<T>("Failed to deserialize value");
         }
     }
 

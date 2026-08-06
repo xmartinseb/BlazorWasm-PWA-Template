@@ -11,10 +11,10 @@
 
 @code {
     int currentCount;
-    const string StorageKey = "saved_counter_value";
+    const string StorageKey = "counter_value";
 
     protected override async Task OnInitializedAsync()
-        => currentCount = await LocalStorage.GetAsync<int>(StorageKey);
+        => currentCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
 
     private async Task IncrementCount()
         => await LocalStorage.SetAsync(StorageKey, ++currentCount);
