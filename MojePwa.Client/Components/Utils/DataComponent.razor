@@ -1,5 +1,5 @@
 ﻿@typeparam TData
-@inherits ComponentWithGuiState<PeriodicCachedDownloader<TData>.LoadedData>
+@inherits ComponentWithGuiState<DataComponent<TData>.LoadedData>
 @implements IDisposable
 @inject BrowserTtlCache LocalTtlCache
 
@@ -15,21 +15,36 @@
     </StateSwitch>
 
 @code {
+    public readonly record struct CacheUseInfo(string CacheKey, TimeSpan CacheTTL);
+
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
-
-    [Parameter] public string CacheKey { get; set; } = string.Empty;
     [Parameter] public Func<Task<Result<TData>>> LoadFreshData { get; set; } = default!;
-    [Parameter] public TimeSpan DataReloadPeriod { get; set; } = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Pokud není NULL, spustí se automatický timer, který bude periodicky uploadovat zobrazená data
+    /// </summary>
+    [Parameter] public TimeSpan? DataReloadPeriod { get; set; }
+
+    /// <summary>
+    /// Pokud neni NULL, datová komponenta použije local cache v browseru
+    /// </summary>
+    [Parameter] public CacheUseInfo? CacheUsage { get; set; }
+
+    /// <summary>
+    /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
+    /// </summary>
     [Parameter] public bool ShowTimestamp { get; set; } = true;
 
     protected override string LoadingMessage { get; set; } = string.Empty;
 
     CancellationTokenSource? _cts;
     readonly SemaphoreSlim _reloadLock = new(1, 1);
-    string _previousCacheKey = string.Empty;
+
+    string? _previousCacheKey = string.Empty;
+    TimeSpan? _previousReloadPeriod;
 
     public class LoadedData
     {
@@ -39,12 +54,29 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_previousCacheKey == CacheKey)
-            return;
+        var currentCacheKey = CacheUsage?.CacheKey;
 
-        _previousCacheKey = CacheKey;
-        await LoadAndSetGuiStateAsync();
-        StartPeriodicReload();
+        if (CacheUsage is not null && string.IsNullOrWhiteSpace(CacheUsage.Value.CacheKey))
+        {
+            throw new InvalidOperationException("Prázdný string není validní cache key.");
+        }
+
+        // Reagujeme pouze na reálnou změnu CacheKey nebo na změnu periody reloadu
+        bool cacheKeyChanged = _previousCacheKey != currentCacheKey;
+        bool reloadPeriodChanged = _previousReloadPeriod != DataReloadPeriod;
+
+        _previousCacheKey = currentCacheKey;
+        _previousReloadPeriod = DataReloadPeriod;
+
+        if (cacheKeyChanged)
+        {
+            await LoadAndSetGuiStateAsync();
+        }
+
+        if (reloadPeriodChanged || cacheKeyChanged)
+        {
+            StartPeriodicReload();
+        }
     }
 
     void StartPeriodicReload()
@@ -53,17 +85,20 @@
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
 
+        if (DataReloadPeriod is null)
+            return; // Periodicke nacitani neni povoleno
+
         var token = _cts.Token;
 
         _ = Task.Run(async () =>
         {
-            using var periodicTimer = new PeriodicTimer(DataReloadPeriod);
+            using var periodicTimer = new PeriodicTimer(DataReloadPeriod.Value);
 
             try
             {
                 while (await periodicTimer.WaitForNextTickAsync(token))
                 {
-                    await PerformBackgroundReloadAsync(token);
+                    await ReloadDataAsync(token);
                 }
             }
             catch (OperationCanceledException)
@@ -73,8 +108,15 @@
         }, token);
     }
 
+    public async Task RemoveFromCacheAsync() 
+    {
+        if (CacheUsage is null)
+            return;
+        await LocalTtlCache.RemoveAsync(CacheUsage.Value.CacheKey);
+    }
+
     // Periodický reload dat na pozadí. Pokud stále probíhá předchozí reload, tak se další nespustí.
-    async Task PerformBackgroundReloadAsync(CT ct)
+    public async Task ReloadDataAsync(CT ct)
     {
         if (!await _reloadLock.WaitAsync(0, ct))
             return;
@@ -100,11 +142,11 @@
 
             if (fresh.Succeeded)
             {
-                newLoadedData = new LoadedData { Data = fresh.Value, Loaded = DateTime.UtcNow };
+                newLoadedData = new LoadedData { Data = fresh.Value, Loaded = DateTimeOffset.UtcNow };
 
-                if (!string.IsNullOrEmpty(CacheKey))
+                if (CacheUsage is { } c)
                 {
-                    await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
+                    await LocalTtlCache.StoreAsync(c.CacheKey, fresh.Value, c.CacheTTL);
                 }
             }
             else
@@ -122,8 +164,13 @@
                 StateHasChanged(); // Vynutí překreslení s novými daty!
             });
         }
+        catch (UserFriendlyServiceFailException ex)
+        {
+            GuiState = new StateError(ex.Errors);
+        }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine(ex);
             await InvokeAsync(() =>
             {
                 GuiState = new StateError("Unexpected error occurred");
@@ -147,17 +194,17 @@
 
     protected override async Task<Result<LoadedData>> LoadDataAsync()
     {
-        if (!string.IsNullOrEmpty(CacheKey))
+        if (CacheUsage is { } c)
         {
-            var cached = await LocalTtlCache.TryGetAsync<TData>(CacheKey);
+            var cached = await LocalTtlCache.TryGetAsync<TData>(c.CacheKey);
             if (cached.Succeeded)
                 return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
         }
 
         var fresh = await LoadFreshData();
-        if (fresh.Succeeded && !string.IsNullOrEmpty(CacheKey))
+        if (fresh.Succeeded && CacheUsage is { } cu)
         {
-            await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
+            await LocalTtlCache.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL - TimeSpan.FromSeconds(1));
         }
 
         return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTime.UtcNow });

@@ -2,8 +2,8 @@
 @page "/weather"
 @inject IWeatherService WeatherService
 
-<PeriodicCachedDownloader TData="ViewModel" Context="vm" CacheKey="weather_forecasts" 
-    LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)">
+<DataComponent TData="ViewModel" Context="vm"
+               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" CacheUsage="@new("weather_forecasts", TimeSpan.FromSeconds(15))">
 
     <table class="table">
         <thead>
@@ -26,7 +26,7 @@
             }
         </tbody>
     </table>
-</PeriodicCachedDownloader>
+</DataComponent>
 
 @code {
     async Task<Result<ViewModel>> LoadFreshData()
