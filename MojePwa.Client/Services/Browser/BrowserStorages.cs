@@ -75,6 +75,9 @@ public sealed class BrowserTtlCache(LocalStorage localStorage)
         return Result.Ok(entry);
     }
 
+    public ValueTask RemoveAsync(string cacheKey)
+        => localStorage.RemoveAsync(cacheKey);
+
     public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTimeOffset Stored, TimeSpan Ttl)
     {
         [JsonIgnore]

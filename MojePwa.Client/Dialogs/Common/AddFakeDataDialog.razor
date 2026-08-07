@@ -1,0 +1,83 @@
+﻿@using System.ComponentModel.DataAnnotations
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IFakeDataService FakeDataService
+
+<EditForm Model="NewFakeDataVm" OnValidSubmit="SubmitAsync">
+    <DataAnnotationsValidator />
+
+    <RadzenStack Gap="1rem">
+        <RadzenStack Gap="0.25rem">
+            <RadzenFormField Text="Key" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="NewFakeDataVm.Key" MaxLength="16" />
+            </RadzenFormField>
+            <ValidationMessage For="() => NewFakeDataVm.Key" style="color: var(--rz-danger)" />
+        </RadzenStack>
+
+        <RadzenStack Gap="0.25rem">
+            <RadzenFormField Text="Value" Variant="Variant.Outlined">
+                <RadzenTextArea @bind-Value="NewFakeDataVm.Value" MaxLength="128" />
+            </RadzenFormField>
+            <ValidationMessage For="() => NewFakeDataVm.Value" style="color: var(--rz-danger)" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Zrušit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
+                          Click="@(() => DialogService.Close(false))" Disabled="busy" />
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Uložit" ButtonStyle="ButtonStyle.Primary"
+                          Icon="save" IsBusy="busy" BusyText="Ukládám…" />
+        </RadzenStack>
+    </RadzenStack>
+</EditForm>
+
+@code {
+    [Parameter]
+    public ViewModel NewFakeDataVm { get; set; } = new();
+
+    bool busy;
+
+    async Task SubmitAsync()
+    {
+        busy = true;
+        try
+        {
+            var result = await FakeDataService.AddFakeDataAsync(NewFakeDataVm.Key, NewFakeDataVm.Value, CT.None);
+
+            if (result.Succeeded)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Uloženo", "Fake data byla nahrána na server");
+                DialogService.Close(true);
+            }
+            else
+            {
+                // Služba selhala → červená notifikace, dialog zůstává otevřený.
+                NotificationService.Notify(NotificationSeverity.Error, "Uložení fake dat selhalo", string.Join(" ", result.Errors));
+            }
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    public static async Task<bool> ShowAsync(DialogService dialogService)
+    {
+        var title = "Přidat fake data";
+        var result = await dialogService.OpenAsync<AddFakeDataDialog>(title, new Dictionary<string, object?>
+        {
+            // Sem se doplni parametry, pokud budou potreba
+        });
+        return result is true;
+    }
+
+    public class ViewModel
+    {
+        [Required]
+        [StringLength(16)]
+        public string Key { get; set; } = "";
+        
+        [Required]
+        [StringLength(128)]
+        public string Value { get; set; } = "";
+    }
+}

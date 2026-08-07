@@ -1,7 +1,5 @@
-// Caution! Be sure you understand the caveats before publishing an application with
-// offline support. See https://aka.ms/blazor-offline-considerations
-
 self.importScripts('./service-worker-assets.js');
+self.importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
@@ -52,4 +50,21 @@ async function onFetch(event) {
     }
 
     return cachedResponse || fetch(event.request);
+}
+
+
+if (workbox) {
+    // Nastavení Background Sync pluginu pro Outbox frontu
+    const bgSyncPlugin = new workbox.backgroundSync.BackgroundSyncPlugin('apiOfflineQueue', {
+        maxRetentionTime: 24 * 60 // Zkusí neodeslané požadavky posílat po dobu 24 hodin
+    });
+
+    // Zachytávání POST/PUT/DELETE požadavků na API
+    workbox.routing.registerRoute(
+        ({ url }) => url.pathname.startsWith('/api/'),
+        new workbox.strategies.NetworkOnly({
+            plugins: [bgSyncPlugin]
+        }),
+        ['POST', 'PUT', 'DELETE']
+    );
 }

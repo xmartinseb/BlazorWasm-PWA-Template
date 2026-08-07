@@ -26,9 +26,13 @@ public abstract class ComponentWithGuiState<TDataLoaded> : ComponentBase
     /// </summary>
     protected async Task LoadAndSetGuiStateAsync()
     {
-        GuiState = new StateLoading(LoadingMessage);
+        // Pokud už data byla načtena, jen se aktivuje IsReloading. Pokud ještě nejsou, začíná se stavem Loading 
+        if (GuiState is not StateLoaded<TDataLoaded>)
+            GuiState = new StateLoading(LoadingMessage);
+
         try
         {
+            SetIsReloadingIfAlreadyLoaded(true);
             var result = await LoadDataAsync();
             if (result.Succeeded)
                 GuiState = result.Value is { } data ? new StateLoaded<TDataLoaded>(data) : new StateError("Byla načtena prázdná odpověď NULL");
@@ -44,6 +48,19 @@ public abstract class ComponentWithGuiState<TDataLoaded> : ComponentBase
         {
             // Sem by to padat nemělo
             GuiState = new StateError("Neznámá chyba");
+        }
+        finally
+        {
+            SetIsReloadingIfAlreadyLoaded(false);
+        }
+    }
+
+    void SetIsReloadingIfAlreadyLoaded(bool isReloading)
+    {
+        if (GuiState is StateLoaded<TDataLoaded> loaded)
+        {
+            loaded.IsReloading = isReloading;
+            StateHasChanged();
         }
     }
 }

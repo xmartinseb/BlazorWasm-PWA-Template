@@ -1,0 +1,59 @@
+﻿@page "/fake-data"
+@inject IFakeDataService FakeDataService
+@inject BrowserTtlCache Cache
+@inject DialogService DialogService
+@inherits ComponentWithGuiState<FakeData.ViewModel>
+
+<h2>Fake Data</h2>
+<RadzenButton Click="AddFakeDataClick">Přidat fake data</RadzenButton>
+<div class="mt-5">
+<StateSwitch TData="FakeData.ViewModel" Context="vm" State="GuiState">
+    @switch (vm.FakeData.Count)
+    {
+        case 0:
+            <div>Fake databáze je prázdná</div>
+            break;
+        case >0:
+            foreach (var item in vm.FakeData)
+            {
+                <div>
+                    <b>@item.Key:</b> @item.Value
+                </div>
+            }
+            break;
+    }
+</StateSwitch>
+</div>
+
+    @code {
+    const string cacheKey = "fake-data";
+    static readonly TimeSpan cacheTtl = TimeSpan.FromSeconds(10);
+
+    protected override string LoadingMessage { get; set; } = "Načítám testovací fake data";
+
+    protected override async Task<Result<ViewModel>> LoadDataAsync()
+    {
+        var cached = await Cache.TryGetAsync<ViewModel>(cacheKey);
+        if (cached.Succeeded)
+            return Result.Ok(cached.Value.CachedValue);
+
+        var newData = (await FakeDataService.GetAllDataAsync(CT.None)).Unwrap();
+        var newDataVm = new ViewModel(newData);
+        await Cache.StoreAsync(cacheKey, newDataVm, cacheTtl);
+        return Result.Ok(newDataVm);
+    }
+
+    protected override Task OnInitializedAsync() => LoadAndSetGuiStateAsync();
+
+    public sealed record ViewModel(Dictionary<string, string> FakeData);
+
+    async Task AddFakeDataClick()
+    {
+        var result = await AddFakeDataDialog.ShowAsync(DialogService);
+        if (result is true)
+        {
+            await Cache.RemoveAsync(cacheKey);
+            await LoadAndSetGuiStateAsync();
+        }
+    }
+}

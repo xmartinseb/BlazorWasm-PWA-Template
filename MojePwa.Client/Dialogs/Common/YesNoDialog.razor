@@ -1,0 +1,26 @@
+﻿@inject DialogService DialogService
+
+<RadzenStack Gap="1.5rem">
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <RadzenText TextStyle="TextStyle.Body1">@Message</RadzenText>
+    }
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Text="@NoText" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
+                      Click="@(() => DialogService.Close(false))" />
+        <RadzenButton Text="@YesText" ButtonStyle="ButtonStyle.Primary"
+                      Click="@(() => DialogService.Close(true))" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    /// <summary>Otázka zobrazená v těle dialogu (volitelná – titulek se dá zadat i přes <c>title</c>).</summary>
+    [Parameter] public string? Message { get; set; }
+
+    /// <summary>Popisek potvrzovacího tlačítka. Výchozí „Ano“.</summary>
+    [Parameter] public string YesText { get; set; } = "Ano";
+
+    /// <summary>Popisek zamítavého tlačítka. Výchozí „Ne“.</summary>
+    [Parameter] public string NoText { get; set; } = "Ne";
+}

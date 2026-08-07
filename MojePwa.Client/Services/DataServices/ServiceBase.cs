@@ -26,15 +26,6 @@ public abstract class ServiceBase(HttpClient httpClient)
     {
         try
         {
-            //await using var db = await dbFactory.CreateDbContextAsync(ct);
-            //var currentUser = await currentUserAcc.GetUserInfoAsync();
-
-            //if (currentUser is null)
-            //    return error(["Není přihlášený žádný uživatel"]);
-
-            //if (requiredRoles is { RequiredRoles: [_, ..] required } && !currentUser.Value.HasAnyRoleFrom(required))
-            //    return error(["Nemáte oprávnění pro tuto operaci"]);
-
             return await action(new ServiceOperationContext());
         }
         catch (OperationCanceledException)
@@ -52,5 +43,9 @@ public abstract class ServiceBase(HttpClient httpClient)
         }
     }
 
+    /// <summary>
+    /// Kontext vykonávání operace může obsahovat např. přihlášeného uživatele a jiné informace.
+    /// Zaobalení do record struct, aby se nemusela předávat spousta parametrů.
+    /// </summary>
     public readonly record struct ServiceOperationContext();
 }

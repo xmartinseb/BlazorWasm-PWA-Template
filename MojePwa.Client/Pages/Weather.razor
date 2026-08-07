@@ -31,7 +31,6 @@
 @code {
     async Task<Result<ViewModel>> LoadFreshData()
     {
-        await Task.Delay(200, CT.None); // Fake delay (GUI test)
         var forecasts = (await WeatherService.GetForecastAsync(CT.None)).Unwrap();
         return Result.Ok(new ViewModel(forecasts));
     }
