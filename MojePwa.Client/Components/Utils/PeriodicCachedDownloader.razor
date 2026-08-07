@@ -3,9 +3,8 @@
 @implements IDisposable
 @inject BrowserTtlCache LocalTtlCache
 
-<StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent" 
-    ErrorContent="ErrorContent" OnRetry="OnRetry">
-
+<StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
+             ErrorContent="ErrorContent" OnRetry="OnRetry">
     @ChildContent?.Invoke(data.Data)
     <div>
         <b>Čas načtení: </b> @data.LoadedUtc.ToLocalTime().ToString("HH:mm:ss")
@@ -22,7 +21,7 @@
     [Parameter] public Func<Task<Result<TData>>> LoadFreshData { get; set; } = default!;
     [Parameter] public TimeSpan DataReloadPeriod { get; set; } = TimeSpan.FromMinutes(1);
 
-    protected override string LoadingMessage { get; set; } = "Načítání dat...";
+    protected override string LoadingMessage { get; set; } = string.Empty;
 
     CancellationTokenSource? _cts;
     readonly SemaphoreSlim _reloadLock = new(1, 1);
@@ -36,26 +35,22 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // Spustíme inicializaci a timer pouze pokud se změnil CacheKey nebo poprvé
-        if (_previousCacheKey != CacheKey)
-        {
-            _previousCacheKey = CacheKey;
+        if (_previousCacheKey == CacheKey)
+            return;
 
-            await LoadAndSetGuiStateAsync();
-            StartPeriodicReload();
-        }
+        _previousCacheKey = CacheKey;
+        await LoadAndSetGuiStateAsync();
+        StartPeriodicReload();
     }
 
     void StartPeriodicReload()
     {
-        // Zrušíme předchozí běh timeru, pokud běžel
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = new CancellationTokenSource();
 
         var token = _cts.Token;
 
-        // Spustíme asynchronní smyčku na pozadí (PeriodicTimer je v .NET 6+ nejčistší řešení)
         _ = Task.Run(async () =>
         {
             using var periodicTimer = new PeriodicTimer(DataReloadPeriod);
@@ -69,11 +64,12 @@
             }
             catch (OperationCanceledException)
             {
-                // Ignorujeme při zrušení (Dispose / Změna parametrů)
+                // Není to chyba. Je to ukončení (Dispose / Změna parametrů)
             }
         }, token);
     }
 
+    // Periodický reload dat na pozadí. Pokud stále probíhá předchozí reload, tak se další nespustí.
     async Task PerformBackgroundReloadAsync(CancellationToken cancellationToken)
     {
         if (!await _reloadLock.WaitAsync(0, cancellationToken))
@@ -84,32 +80,51 @@
             if (GuiState is not StateLoaded<LoadedData> loaded)
                 return;
 
-            // Bezpečné překlopení UI stavu přes InvokeAsync
+            // 1. Překlopení UI indikátoru načítání
             await InvokeAsync(() =>
             {
                 loaded.IsReloading = true;
                 StateHasChanged();
             });
 
+            // 2. Načtení čerstvých dat ze zdroje
             var fresh = await LoadFreshData();
 
-            await InvokeAsync(async () =>
+            // 3. Příprava nového stavu a zápis do cache (na pozadí, Mimo InvokeAsync!)
+            LoadedData? newLoadedData = null;
+            StateError? newError = null;
+
+            if (fresh.Succeeded)
             {
-                if (fresh.Succeeded)
+                newLoadedData = new LoadedData { Data = fresh.Value, LoadedUtc = DateTime.UtcNow };
+
+                if (!string.IsNullOrEmpty(CacheKey))
                 {
-                    loaded.LoadedData = new LoadedData { Data = fresh.Value, LoadedUtc = DateTime.UtcNow };
                     await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
                 }
-                else
-                {
-                    GuiState = new StateError(fresh.Errors);
-                }
+            }
+            else
+            {
+                newError = new StateError(fresh.Errors);
+            }
+
+            // 4. Přepnutí do nového stavu UI
+            await InvokeAsync(() =>
+            {
+                if (newLoadedData != null)
+                    loaded.LoadedData = newLoadedData;
+                else if (newError != null)
+                    GuiState = newError;
+                StateHasChanged(); // Vynutí překreslení s novými daty!
             });
         }
         catch (Exception ex)
         {
-            // Zde zachytíme případné chyby z načítání na pozadí
-            await InvokeAsync(() => GuiState = new StateError("Unexpected error occurred"));
+            await InvokeAsync(() =>
+            {
+                GuiState = new StateError("Unexpected error occurred");
+                StateHasChanged();
+            });
         }
         finally
         {
@@ -126,10 +141,6 @@
         }
     }
 
-    /// <summary>
-    /// Volá se automaticky pod LoadAndSetGuiStateAsync POUZE při prvnim načtení komponenty
-    /// </summary>
-    /// <returns>Výsledek, který přepne komponentu do nového stavu</returns>
     protected override async Task<Result<LoadedData>> LoadDataAsync()
     {
         if (!string.IsNullOrEmpty(CacheKey))
@@ -140,8 +151,11 @@
         }
 
         var fresh = await LoadFreshData();
-        if (fresh.Succeeded)
+        if (fresh.Succeeded && !string.IsNullOrEmpty(CacheKey))
+        {
             await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
+        }
+
         return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, LoadedUtc = DateTime.UtcNow });
     }
 
