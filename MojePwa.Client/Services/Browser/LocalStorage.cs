@@ -6,16 +6,25 @@ using System.Text.Json.Serialization;
 namespace MojePwa.Client.Services.Browser;
 
 /// <summary>
-/// Prostý reader/writer pro local cache, jen obaluje Javascript do čitelných funkcí
+/// Prostý reader/writer pro local cache, jen obaluje Javascript do čitelných funkcí.
+/// Local storage přežije zavření prohlížeče a je sdílen mezi záložkami.
 /// </summary>
-public sealed class LocalStorage(IJSRuntime js)
+public sealed class LocalStorage(IJSRuntime js) : BrowserStorageBase(js, "localStorage");
+
+/// <summary>
+/// Prostý reader/writer pro session cache, jen obaluje Javascript do čitelných funkcí.
+/// Session storage se smaže po zavření záložky. Navíc není sdílena mezi záložkami, takže je vhodná pro data, která mají být izolovaná na jednu záložku.
+/// </summary>
+public sealed class SessionStorage(IJSRuntime js) : BrowserStorageBase(js, "sessionStorage");
+
+public abstract class BrowserStorageBase(IJSRuntime js, string storageName)
 {
     public ValueTask SetAsync<T>(string key, T value)
-        => js.InvokeVoidAsync("localStorage.setItem", key, JsonSerializer.Serialize(value));
+        => js.InvokeVoidAsync($"{storageName}.setItem", key, JsonSerializer.Serialize(value));
 
     public async Task<Result<T>> TryGetAsync<T>(string key)
     {
-        if (await js.InvokeAsync<string?>("localStorage.getItem", key) is not string json)
+        if (await js.InvokeAsync<string?>($"{storageName}.getItem", key) is not string json)
             return Result.Err<T>("Key not found");
 
         try
@@ -33,10 +42,10 @@ public sealed class LocalStorage(IJSRuntime js)
     }
 
     public ValueTask RemoveAsync(string key)
-        => js.InvokeVoidAsync("localStorage.removeItem", key);
+        => js.InvokeVoidAsync($"{storageName}.removeItem", key);
 
     public ValueTask ClearAsync()
-        => js.InvokeVoidAsync("localStorage.clear");
+        => js.InvokeVoidAsync($"{storageName}.clear");
 }
 
 /// <summary>
@@ -65,13 +74,10 @@ public sealed class BrowserTtlCache(LocalStorage localStorage)
 
         return Result.Ok(entry);
     }
-}
 
-public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTime StoredUtc, TimeSpan Ttl)
-{
-    [JsonIgnore]
-    public bool IsExpired => DateTime.UtcNow - StoredUtc > Ttl;
-
-    [JsonIgnore]
-    public DateTime StoredLocal => StoredUtc.ToLocalTime();
+    public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTime StoredUtc, TimeSpan Ttl)
+    {
+        [JsonIgnore]
+        public bool IsExpired => DateTime.UtcNow - StoredUtc > Ttl;
+    }
 }
