@@ -1,21 +1,51 @@
 ﻿@page "/counter"
 @inject LocalStorage LocalStorage
+@inject SessionStorage SessionStorage
+
 
 <PageTitle>Counter</PageTitle>
 
-<h1>Counter</h1>
+<div>
+    <h2>Local storage counter (= shared, permanent)</h2>
+    <p role="status">Current local count: @currentLocalCount</p>
+    <button class="btn btn-primary" @onclick="IncrementLocalCount">Click me</button>
+</div>
 
-<p role="status">Current count: @currentCount</p>
-
-<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+<div class="mt-5">
+    <h2>Session storage counter (= temporary, per-tab)</h2>
+    <p role="status">Current session count: @currentSessionCount</p>
+    <button class="btn btn-primary" @onclick="IncrementSessionCount">Click me</button>
+</div>
 
 @code {
-    int currentCount;
+    int currentLocalCount, currentSessionCount;
+
+    /// <summary>
+    /// Local a Session storage mohou mít stejné cache keys bez konfliktu, protože to jsou nezávislá úložiště.
+    /// Local session je sdílen mezi všemi okny a záložkami STEJNÉHO ORIGIN (protokol, doména, port), Session storage je per-záložka.
+    /// </summary>
     const string StorageKey = "counter_value";
 
-    protected override async Task OnInitializedAsync()
-        => currentCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
+    // Načtení dat bezpečně až PO vygenerování HTML na klientovi (kvůli JS Interop / Prerenderingu)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
+            currentSessionCount = (await SessionStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
+            StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
+        }
+    }
 
-    private async Task IncrementCount()
-        => await LocalStorage.SetAsync(StorageKey, ++currentCount);
+    async Task IncrementLocalCount()
+    {
+        currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (zabránění konfliktu)
+        await LocalStorage.SetAsync(StorageKey, ++currentLocalCount);
+    }
+
+    async Task IncrementSessionCount()
+    { 
+        currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
+        await SessionStorage.SetAsync(StorageKey, ++currentSessionCount);
+    }
 }

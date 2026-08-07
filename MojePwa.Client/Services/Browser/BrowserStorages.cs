@@ -7,7 +7,7 @@ namespace MojePwa.Client.Services.Browser;
 
 /// <summary>
 /// Prostý reader/writer pro local cache, jen obaluje Javascript do čitelných funkcí.
-/// Local storage přežije zavření prohlížeče a je sdílen mezi záložkami.
+/// Local storage přežije zavření prohlížeče a je sdílen mezi všemi okny a záložkami STEJNÉHO ORIGIN (protokol, doména, port)
 /// </summary>
 public sealed class LocalStorage(IJSRuntime js) : BrowserStorageBase(js, "localStorage");
 
