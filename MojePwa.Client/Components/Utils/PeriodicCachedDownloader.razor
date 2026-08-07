@@ -7,7 +7,7 @@
              ErrorContent="ErrorContent" OnRetry="OnRetry">
     @ChildContent?.Invoke(data.Data)
     <div>
-        <b>Čas načtení: </b> @data.LoadedUtc.ToLocalTime().ToString("HH:mm:ss")
+        <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
     </div>
 </StateSwitch>
 
@@ -30,7 +30,7 @@
     public class LoadedData
     {
         public required TData Data { get; set; }
-        public required DateTime LoadedUtc { get; set; }
+        public required DateTimeOffset Loaded { get; set; }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -96,7 +96,7 @@
 
             if (fresh.Succeeded)
             {
-                newLoadedData = new LoadedData { Data = fresh.Value, LoadedUtc = DateTime.UtcNow };
+                newLoadedData = new LoadedData { Data = fresh.Value, Loaded = DateTime.UtcNow };
 
                 if (!string.IsNullOrEmpty(CacheKey))
                 {
@@ -147,7 +147,7 @@
         {
             var cached = await LocalTtlCache.TryGetAsync<TData>(CacheKey);
             if (cached.Succeeded)
-                return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, LoadedUtc = cached.Value.StoredUtc });
+                return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
         }
 
         var fresh = await LoadFreshData();
@@ -156,7 +156,7 @@
             await LocalTtlCache.StoreAsync(CacheKey, fresh.Value, DataReloadPeriod - TimeSpan.FromSeconds(1));
         }
 
-        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, LoadedUtc = DateTime.UtcNow });
+        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTime.UtcNow });
     }
 
     public void Dispose()

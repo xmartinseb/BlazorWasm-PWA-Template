@@ -75,9 +75,9 @@ public sealed class BrowserTtlCache(LocalStorage localStorage)
         return Result.Ok(entry);
     }
 
-    public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTime StoredUtc, TimeSpan Ttl)
+    public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTimeOffset Stored, TimeSpan Ttl)
     {
         [JsonIgnore]
-        public bool IsExpired => DateTime.UtcNow - StoredUtc > Ttl;
+        public bool IsExpired => DateTimeOffset.UtcNow - Stored > Ttl;
     }
 }
