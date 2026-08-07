@@ -6,10 +6,13 @@
 <StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
              ErrorContent="ErrorContent" OnRetry="OnRetry">
     @ChildContent?.Invoke(data.Data)
-    <div>
-        <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
-    </div>
-</StateSwitch>
+    @if (ShowTimestamp)
+    {
+        <div>
+            <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
+        </div>
+    }
+    </StateSwitch>
 
 @code {
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
@@ -19,7 +22,8 @@
 
     [Parameter] public string CacheKey { get; set; } = string.Empty;
     [Parameter] public Func<Task<Result<TData>>> LoadFreshData { get; set; } = default!;
-    [Parameter] public TimeSpan DataReloadPeriod { get; set; } = TimeSpan.FromMinutes(1);
+    [Parameter] public TimeSpan DataReloadPeriod { get; set; } = TimeSpan.FromDays(1);
+    [Parameter] public bool ShowTimestamp { get; set; } = true;
 
     protected override string LoadingMessage { get; set; } = string.Empty;
 
