@@ -102,11 +102,11 @@
     {
         _cts?.Cancel();
         _cts?.Dispose();
-        _cts = new CancellationTokenSource();
 
         if (DataReloadPeriod is null)
             return; // Periodicke nacitani neni povoleno
 
+        _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
         _ = Task.Run(async () =>
@@ -185,7 +185,11 @@
         }
         catch (UserFriendlyServiceFailException ex)
         {
-            GuiState = new StateError(ex.Errors);
+            await InvokeAsync(() =>
+            {
+                GuiState = new StateError(ex.Errors);
+                StateHasChanged();
+            });
         }
         catch (Exception ex)
         {
@@ -223,10 +227,10 @@
         var fresh = await LoadFreshData();
         if (fresh.Succeeded && CacheUsage is { } cu)
         {
-            await GetCache()!.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL - TimeSpan.FromSeconds(1));
+            await GetCache()!.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL);
         }
 
-        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTime.UtcNow });
+        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTimeOffset.UtcNow });
     }
 
     public void Dispose()
