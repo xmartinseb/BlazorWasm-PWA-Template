@@ -2,7 +2,7 @@
 @page "/weather"
 @inject IWeatherService WeatherService
 
-<DataComponent TData="ViewModel" Context="vm"
+<DataComponent TData="ViewModel" TBrowserStorage="SessionStorage" Context="vm"
                LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" CacheUsage="@new(TimeSpan.FromSeconds(15))">
 
     <table class="table">

@@ -1,12 +1,11 @@
 ﻿@page "/fake-data"
 @inject IFakeDataService FakeDataService
-@inject BrowserTtlCache Cache
 @inject DialogService DialogService
 
 <h2>Fake Data</h2>
 <RadzenButton Click="AddFakeDataClick">Přidat fake data</RadzenButton>
 <div class="mt-5">
-    <DataComponent @ref="dataComponent" TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..."
+    <DataComponent @ref="dataComponent" TData="ViewModel" TBrowserStorage="LocalStorage" Context="vm" LoadingMessage="Načítám fake data..."
                    LoadFreshData="LoadFreshData" DataReloadPeriod="null" CacheUsage="@new(TimeSpan.FromSeconds(60))">
 
         @switch (vm.FakeData.Count)
@@ -27,7 +26,7 @@
 </div>
 
 @code {
-    DataComponent<ViewModel>? dataComponent;
+    DataComponent<ViewModel, LocalStorage>? dataComponent;
 
     async Task<Result<ViewModel>> LoadFreshData()
     {

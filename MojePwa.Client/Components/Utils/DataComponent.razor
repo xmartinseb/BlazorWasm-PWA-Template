@@ -1,7 +1,8 @@
 ﻿@typeparam TData
-@inherits ComponentWithGuiState<DataComponent<TData>.LoadedData>
+@typeparam TBrowserStorage where TBrowserStorage : BrowserStorageBase
+@inherits ComponentWithGuiState<DataComponent<TData, TBrowserStorage>.LoadedData>
 @implements IDisposable
-@inject BrowserTtlCache LocalTtlCache
+@inject BrowserTtlCache<TBrowserStorage> LocalTtlCache
 
 <StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
              ErrorContent="ErrorContent" OnRetry="OnRetry">
@@ -12,7 +13,7 @@
             <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
         </div>
     }
-    </StateSwitch>
+</StateSwitch>
 
 @code {
     /// <summary>
