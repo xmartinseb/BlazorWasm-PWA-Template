@@ -2,8 +2,9 @@
 @page "/weather"
 @inject IWeatherService WeatherService
 
-<DataComponent TData="ViewModel" TBrowserStorage="SessionStorage" Context="vm"
-               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" CacheUsage="@new(TimeSpan.FromSeconds(15))">
+<DataComponent TData="ViewModel" Context="vm"
+               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" 
+               CacheUsage="@new(TimeSpan.FromSeconds(15), BrowserStorage.Session)">
 
     <table class="table">
         <thead>

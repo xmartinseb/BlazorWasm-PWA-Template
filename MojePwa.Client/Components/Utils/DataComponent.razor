@@ -1,8 +1,8 @@
 ﻿@typeparam TData
-@typeparam TBrowserStorage where TBrowserStorage : BrowserStorageBase
-@inherits ComponentWithGuiState<DataComponent<TData, TBrowserStorage>.LoadedData>
+@inherits ComponentWithGuiState<DataComponent<TData>.LoadedData>
 @implements IDisposable
-@inject BrowserTtlCache<TBrowserStorage> LocalTtlCache
+@inject BrowserTtlCache<LocalStorage> LocalTtlCache
+@inject BrowserTtlCache<SessionStorage> SessionTtlCache
 
 <StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
              ErrorContent="ErrorContent" OnRetry="OnRetry">
@@ -15,16 +15,17 @@
     }
 </StateSwitch>
 
-@code {
+    @code {
     /// <summary>
     /// Nastavení využití cache. Nastavuje se time to live, cache key se umí vybrat automaticky: každý typ TData má svůj cache key
     /// </summary>
     public readonly struct CacheUseInfo
     {
-        public CacheUseInfo(TimeSpan cacheTtl, string? cacheKey = null)
+        public CacheUseInfo(TimeSpan cacheTtl, BrowserStorage storage, string? cacheKey = null)
         {
             CacheTTL = cacheTtl;
             CacheKey = cacheKey ?? typeof(TData).FullName ?? throw new InvalidOperationException("Typ nemá full name");
+            Storage = storage;
         }
 
         /// <summary>
@@ -32,7 +33,16 @@
         /// </summary>
         public string CacheKey { get; }
         public TimeSpan CacheTTL { get; }
+        public BrowserStorage Storage { get; }
     }
+
+    IBrowserTtlCache? GetCache() => CacheUsage?.Storage switch
+    {
+        null => null,
+        BrowserStorage.Local => LocalTtlCache,
+        BrowserStorage.Session => SessionTtlCache,
+        _ => throw new Exception()
+    };
 
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
@@ -72,9 +82,7 @@
         var currentCacheKey = CacheUsage?.CacheKey;
 
         if (CacheUsage is not null && string.IsNullOrWhiteSpace(CacheUsage.Value.CacheKey))
-        {
             throw new InvalidOperationException("Prázdný string není validní cache key.");
-        }
 
         // Reagujeme pouze na reálnou změnu CacheKey nebo na změnu periody reloadu
         bool cacheKeyChanged = _previousCacheKey != currentCacheKey;
@@ -84,14 +92,10 @@
         _previousReloadPeriod = DataReloadPeriod;
 
         if (cacheKeyChanged)
-        {
             await LoadAndSetGuiStateAsync();
-        }
 
         if (reloadPeriodChanged || cacheKeyChanged)
-        {
             StartPeriodicReload();
-        }
     }
 
     void StartPeriodicReload()
@@ -127,7 +131,7 @@
     {
         if (CacheUsage is null)
             return;
-        await LocalTtlCache.RemoveAsync(CacheUsage.Value.CacheKey);
+        await GetCache()!.RemoveAsync(CacheUsage.Value.CacheKey);
     }
 
     // Periodický reload dat na pozadí. Pokud stále probíhá předchozí reload, tak se další nespustí.
@@ -161,7 +165,7 @@
 
                 if (CacheUsage is { } c)
                 {
-                    await LocalTtlCache.StoreAsync(c.CacheKey, fresh.Value, c.CacheTTL);
+                    await GetCache()!.StoreAsync(c.CacheKey, fresh.Value, c.CacheTTL);
                 }
             }
             else
@@ -211,7 +215,7 @@
     {
         if (CacheUsage is { } c)
         {
-            var cached = await LocalTtlCache.TryGetAsync<TData>(c.CacheKey);
+            var cached = await GetCache()!.TryGetAsync<TData>(c.CacheKey);
             if (cached.Succeeded)
                 return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
         }
@@ -219,7 +223,7 @@
         var fresh = await LoadFreshData();
         if (fresh.Succeeded && CacheUsage is { } cu)
         {
-            await LocalTtlCache.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL - TimeSpan.FromSeconds(1));
+            await GetCache()!.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL - TimeSpan.FromSeconds(1));
         }
 
         return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTime.UtcNow });
