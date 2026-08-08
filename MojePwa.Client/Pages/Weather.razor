@@ -3,7 +3,7 @@
 @inject IWeatherService WeatherService
 
 <DataComponent TData="ViewModel" Context="vm"
-               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" CacheUsage="@new("weather_forecasts", TimeSpan.FromSeconds(15))">
+               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" CacheUsage="@new(TimeSpan.FromSeconds(15))">
 
     <table class="table">
         <thead>

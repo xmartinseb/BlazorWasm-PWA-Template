@@ -15,7 +15,23 @@
     </StateSwitch>
 
 @code {
-    public readonly record struct CacheUseInfo(string CacheKey, TimeSpan CacheTTL);
+    /// <summary>
+    /// Nastavení využití cache. Nastavuje se time to live, cache key se umí vybrat automaticky: každý typ TData má svůj cache key
+    /// </summary>
+    public readonly struct CacheUseInfo
+    {
+        public CacheUseInfo(TimeSpan cacheTtl, string? cacheKey = null)
+        {
+            CacheTTL = cacheTtl;
+            CacheKey = cacheKey ?? typeof(TData).FullName ?? throw new InvalidOperationException("Typ nemá full name");
+        }
+
+        /// <summary>
+        /// Cache key se dá specifikovat explicitně, ale často není třeba. Pokud zůstane NULL, vybere se cache key automaticky
+        /// </summary>
+        public string CacheKey { get; }
+        public TimeSpan CacheTTL { get; }
+    }
 
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
@@ -37,8 +53,6 @@
     /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
     /// </summary>
     [Parameter] public bool ShowTimestamp { get; set; } = true;
-
-    protected override string LoadingMessage { get; set; } = string.Empty;
 
     CancellationTokenSource? _cts;
     readonly SemaphoreSlim _reloadLock = new(1, 1);

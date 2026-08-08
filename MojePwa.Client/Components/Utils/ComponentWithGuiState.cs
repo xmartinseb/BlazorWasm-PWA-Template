@@ -18,7 +18,7 @@ public abstract class ComponentWithGuiState<TDataLoaded> : ComponentBase
 
     protected abstract Task<Result<TDataLoaded>> LoadDataAsync();
 
-    protected abstract string LoadingMessage { get; set; }
+    [Parameter] public string LoadingMessage { get; set; } = "Loading";
 
     /// <summary>
     /// Volá pod sebou načítání dat a mění stav komponenty.
