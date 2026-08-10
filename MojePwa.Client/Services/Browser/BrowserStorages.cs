@@ -19,8 +19,13 @@ public enum BrowserStorageType { Local, Session }
 /// </summary>
 public sealed class BrowserStorage(IJSRuntime js)
 {
+    static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+
     public ValueTask SetAsync<T>(BrowserStorageType s, string key, T value)
-        => js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", key, value);
+    {
+        var json = JsonSerializer.Serialize(value, Options);
+        return js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", key, json);
+    }
 
     public async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key)
     {
@@ -29,13 +34,13 @@ public sealed class BrowserStorage(IJSRuntime js)
 
         try
         {
-            return JsonSerializer.Deserialize<T>(json) switch
+            return JsonSerializer.Deserialize<T>(json, Options) switch
             {
                 null => Result.Err<T>("Cannot deserialize NULL"),
                 var obj => Result.Ok(obj)
             };
         }
-        catch
+        catch (JsonException)
         {
             return Result.Err<T>("Failed to deserialize value");
         }
@@ -51,7 +56,7 @@ public sealed class BrowserStorage(IJSRuntime js)
     {
         BrowserStorageType.Local => "localStorage",
         BrowserStorageType.Session => "sessionStorage",
-        _ => throw new Exception()
+        _ => throw new ArgumentOutOfRangeException(nameof(s))
     };
 }
 
