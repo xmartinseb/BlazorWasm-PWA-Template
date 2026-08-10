@@ -27,10 +27,27 @@ public sealed class BrowserStorage(IJSRuntime js)
         return js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", key, json);
     }
 
-    public async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key)
+    /// <summary>
+    /// Pokusí se načíst hodnotu z úložiště prohlížeče. Pokud daný klíč neexistuje, vrátí fallback value. Pokud selže deserializace, vrátí result Err.
+    /// </summary>
+    public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, T fallbackValue)
+        => TryGetAsync<T>(s, key, true, fallbackValue);
+
+    /// <summary>
+    /// Pokusí se načíst hodnotu z úložiště prohlížeče. Pokud daný klíč neexistuje, nebo selže deserializace, vrátí result Err.
+    /// </summary>
+    public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key)
+        => TryGetAsync<T>(s, key, false, default!);
+
+    // Společný logický základ pro obě varianty
+    async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, bool useFallbackValue, T fallbackValue)
     {
         if (await js.InvokeAsync<string?>($"{GetStorageName(s)}.getItem", key) is not string json)
+        {
+            if (useFallbackValue)
+                return Result.Ok(fallbackValue);
             return Result.Err<T>("Key not found");
+        }
 
         try
         {
