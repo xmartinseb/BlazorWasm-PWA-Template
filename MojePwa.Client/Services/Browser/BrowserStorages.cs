@@ -6,37 +6,25 @@ using System.Text.Json.Serialization;
 namespace MojePwa.Client.Services.Browser;
 
 /// <summary>
-/// Deskriptor k odlišení local a session storage
+/// Deskriptor k odlišení local a session storage - webové prohlížeče obsahují oba dva.
+/// Local storage přežije zavření prohlížeče a je sdílen mezi všemi okny a záložkami STEJNÉHO ORIGIN (protokol, doména, port)
+///
+/// Session storage se smaže po zavření záložky. Navíc není sdílena mezi záložkami, takže je vhodná pro krátkodobá data, která mají být izolovaná na jednu záložku.
+/// Díky vazbě na záložku přežije refresh stránky F5 a přesměrování na externí stránku a zpět - zásadní výhody oproti prosté aplikační in memory cache
 /// </summary>
-public enum BrowserStorage { Local, Session }
-
+public enum BrowserStorageType { Local, Session }
 
 /// <summary>
 /// Prostý reader/writer pro local cache, jen obaluje Javascript do čitelných funkcí.
-/// Local storage přežije zavření prohlížeče a je sdílen mezi všemi okny a záložkami STEJNÉHO ORIGIN (protokol, doména, port)
 /// </summary>
-public sealed class LocalStorage(IJSRuntime js) : BrowserStorageBase(js, "localStorage");
-
-
-/// <summary>
-/// Prostý reader/writer pro session cache, jen obaluje Javascript do čitelných funkcí.
-/// Session storage se smaže po zavření záložky. Navíc není sdílena mezi záložkami, takže je vhodná pro data, která mají být izolovaná na jednu záložku.
-/// Díky vazbě na záložku přežije refresh stránky F5 a přesměrování na externí stránku a zpět - zásadní výhody oproti prosté aplikační in memory cache
-/// </summary>
-public sealed class SessionStorage(IJSRuntime js) : BrowserStorageBase(js, "sessionStorage");
-
-
-/// <summary>
-/// Javascriptový základ pro obě úložiště - v podstatě stejná logika
-/// </summary>
-public abstract class BrowserStorageBase(IJSRuntime js, string storageName)
+public sealed class BrowserStorage(IJSRuntime js)
 {
-    public ValueTask SetAsync<T>(string key, T value)
-        => js.InvokeVoidAsync($"{storageName}.setItem", key, value);
+    public ValueTask SetAsync<T>(BrowserStorageType s, string key, T value)
+        => js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", key, value);
 
-    public async Task<Result<T>> TryGetAsync<T>(string key)
+    public async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key)
     {
-        if (await js.InvokeAsync<string?>($"{storageName}.getItem", key) is not string json)
+        if (await js.InvokeAsync<string?>($"{GetStorageName(s)}.getItem", key) is not string json)
             return Result.Err<T>("Key not found");
 
         try
@@ -53,60 +41,55 @@ public abstract class BrowserStorageBase(IJSRuntime js, string storageName)
         }
     }
 
-    public ValueTask RemoveAsync(string key)
-        => js.InvokeVoidAsync($"{storageName}.removeItem", key);
+    public ValueTask RemoveAsync(BrowserStorageType s, string key)
+        => js.InvokeVoidAsync($"{GetStorageName(s)}.removeItem", key);
 
-    public ValueTask ClearAsync()
-        => js.InvokeVoidAsync($"{storageName}.clear");
+    public ValueTask ClearAsync(BrowserStorageType s)
+        => js.InvokeVoidAsync($"{GetStorageName(s)}.clear");
+
+    static string GetStorageName(BrowserStorageType s) => s switch
+    {
+        BrowserStorageType.Local => "localStorage",
+        BrowserStorageType.Session => "sessionStorage",
+        _ => throw new Exception()
+    };
 }
 
 
 /// <summary>
-/// Základ pro obě varianty cachovaného úložiště
-/// </summary>
-public interface IBrowserTtlCache
-{
-    ValueTask StoreAsync<T>(string key, T value, TimeSpan ttl);
-    Task<Result<BrowserCacheEntry<T>>> TryGetAsync<T>(string key, bool readExpired = false);
-    ValueTask RemoveAsync(string cacheKey);
-}
-
-
-/// <summary>
-/// Je postaven nad daným browser storage. Na záznamy nahlíží jako na cached objekty s TTL (time-to-live). 
+/// Je postaven nad BrowserStorage. Na uložené hodnoty nahlíží jako na cached objekty s TTL (time-to-live). 
 /// Záznamy se ukládají do LocalStorage nebo SessionStorage a při čtení se kontroluje, zda ještě nejsou expirované.
 /// </summary>
-public sealed class BrowserTtlCache<TStorage>(TStorage storage) : IBrowserTtlCache 
-    where TStorage : BrowserStorageBase
+public sealed class BrowserTtlCache(BrowserStorage storage)
 {
-    public ValueTask StoreAsync<T>(string key, T value, TimeSpan ttl)
+    public ValueTask StoreAsync<T>(BrowserStorageType s, string key, T value, TimeSpan ttl)
     {
         var entry = new BrowserCacheEntry<T>(value, DateTimeOffset.UtcNow, ttl);
-        return storage.SetAsync(key, entry);
+        return storage.SetAsync(s, key, entry);
     }
 
-    public async Task<Result<BrowserCacheEntry<T>>> TryGetAsync<T>(string key, bool readExpiredEnabled = false)
+    public async Task<Result<BrowserCacheEntry<T>>> TryGetAsync<T>(BrowserStorageType s, string key, bool readExpiredEnabled = false)
     {
-        var result = await storage.TryGetAsync<BrowserCacheEntry<T>>(key);
+        var result = await storage.TryGetAsync<BrowserCacheEntry<T>>(s, key);
         if (!result.Succeeded)
             return Result.Err<BrowserCacheEntry<T>>(result.Errors);
         var entry = result.Value;
         if (!readExpiredEnabled && entry.IsExpired)
         {
-            await storage.RemoveAsync(key);
+            await storage.RemoveAsync(s, key);
             return Result.Err<BrowserCacheEntry<T>>("Cache expired");
         }
 
         return Result.Ok(entry);
     }
 
-    public ValueTask RemoveAsync(string cacheKey)
-        => storage.RemoveAsync(cacheKey);
+    public ValueTask RemoveAsync(BrowserStorageType s, string cacheKey)
+        => storage.RemoveAsync(s, cacheKey);
 }
 
 
 /// <summary>
-/// Data v cache s metadaty
+/// Data v cache s časem vytvoření a TTL, který určuje čas expirace
 /// </summary>
 public readonly record struct BrowserCacheEntry<T>(T CachedValue, DateTimeOffset Stored, TimeSpan Ttl)
 {

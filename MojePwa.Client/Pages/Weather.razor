@@ -4,7 +4,7 @@
 
 <DataComponent TData="ViewModel" Context="vm"
                LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" 
-               CacheUsage="@new(TimeSpan.FromSeconds(15), BrowserStorage.Session)">
+               CacheUsage="@new(TimeSpan.FromSeconds(15), BrowserStorageType.Session)">
 
     <table class="table">
         <thead>

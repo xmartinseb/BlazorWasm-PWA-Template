@@ -1,8 +1,7 @@
 ﻿@typeparam TData
 @inherits ComponentWithGuiState<DataComponent<TData>.LoadedData>
 @implements IDisposable
-@inject BrowserTtlCache<LocalStorage> LocalTtlCache
-@inject BrowserTtlCache<SessionStorage> SessionTtlCache
+@inject BrowserTtlCache BrowserTtlCache
 
 <StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
              ErrorContent="ErrorContent" OnRetry="OnRetry">
@@ -21,8 +20,10 @@
     /// </summary>
     public readonly struct CacheUseInfo
     {
-        public CacheUseInfo(TimeSpan cacheTtl, BrowserStorage storage, string? cacheKey = null)
+        public CacheUseInfo(TimeSpan cacheTtl, BrowserStorageType storage, string? cacheKey = null)
         {
+            if (cacheKey == string.Empty)
+                throw new ArgumentException("Cache key nemůže být prázdný string", nameof(cacheKey));
             CacheTTL = cacheTtl;
             CacheKey = cacheKey ?? typeof(TData).FullName ?? throw new InvalidOperationException("Typ nemá full name");
             Storage = storage;
@@ -33,16 +34,8 @@
         /// </summary>
         public string CacheKey { get; }
         public TimeSpan CacheTTL { get; }
-        public BrowserStorage Storage { get; }
+        public BrowserStorageType Storage { get; }
     }
-
-    IBrowserTtlCache? GetCache() => CacheUsage?.Storage switch
-    {
-        null => null,
-        BrowserStorage.Local => LocalTtlCache,
-        BrowserStorage.Session => SessionTtlCache,
-        _ => throw new Exception()
-    };
 
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
@@ -129,9 +122,9 @@
 
     public async Task RemoveFromCacheAsync() 
     {
-        if (CacheUsage is null)
+        if (CacheUsage is not { } c)
             return;
-        await GetCache()!.RemoveAsync(CacheUsage.Value.CacheKey);
+        await BrowserTtlCache.RemoveAsync(c.Storage, c.CacheKey);
     }
 
     // Periodický reload dat na pozadí. Pokud stále probíhá předchozí reload, tak se další nespustí.
@@ -165,7 +158,7 @@
 
                 if (CacheUsage is { } c)
                 {
-                    await GetCache()!.StoreAsync(c.CacheKey, fresh.Value, c.CacheTTL);
+                    await BrowserTtlCache.StoreAsync(c.Storage, c.CacheKey, fresh.Value, c.CacheTTL);
                 }
             }
             else
@@ -219,7 +212,7 @@
     {
         if (CacheUsage is { } c)
         {
-            var cached = await GetCache()!.TryGetAsync<TData>(c.CacheKey);
+            var cached = await BrowserTtlCache.TryGetAsync<TData>(c.Storage, c.CacheKey);
             if (cached.Succeeded)
                 return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
         }
@@ -227,7 +220,7 @@
         var fresh = await LoadFreshData();
         if (fresh.Succeeded && CacheUsage is { } cu)
         {
-            await GetCache()!.StoreAsync(cu.CacheKey, fresh.Value, cu.CacheTTL);
+            await BrowserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, fresh.Value, cu.CacheTTL);
         }
 
         return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTimeOffset.UtcNow });

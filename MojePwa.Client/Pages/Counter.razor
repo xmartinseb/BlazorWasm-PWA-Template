@@ -1,6 +1,5 @@
 ﻿@page "/counter"
-@inject LocalStorage LocalStorage
-@inject SessionStorage SessionStorage
+@inject BrowserStorage BrowserStorage
 
 
 <PageTitle>Counter</PageTitle>
@@ -31,21 +30,21 @@
     {
         if (firstRender)
         {
-            currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
-            currentSessionCount = (await SessionStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0);
+            currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey)).UnwrapOr(0);
+            currentSessionCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Session, StorageKey)).UnwrapOr(0);
             StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
         }
     }
 
     async Task IncrementLocalCount()
     {
-        currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (zabránění konfliktu)
-        await LocalStorage.SetAsync(StorageKey, ++currentLocalCount);
+        currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (zabránění konfliktu)
+        await BrowserStorage.SetAsync(BrowserStorageType.Local, StorageKey, ++currentLocalCount);
     }
 
     async Task IncrementSessionCount()
     { 
-        currentLocalCount = (await LocalStorage.TryGetAsync<int>(StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
-        await SessionStorage.SetAsync(StorageKey, ++currentSessionCount);
+        currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Session, StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
+        await BrowserStorage.SetAsync(BrowserStorageType.Session, StorageKey, ++currentSessionCount);
     }
 }

@@ -7,7 +7,7 @@
 <div class="mt-5">
     <DataComponent @ref="dataComponent" TData="ViewModel" TBrowserStorage="LocalStorage" Context="vm" LoadingMessage="Načítám fake data..."
                    LoadFreshData="LoadFreshData" DataReloadPeriod="null" 
-                   CacheUsage="@new(TimeSpan.FromSeconds(60), BrowserStorage.Local)">
+                   CacheUsage="@new(TimeSpan.FromSeconds(60), BrowserStorageType.Local)">
 
         @switch (vm.FakeData.Count)
         {
