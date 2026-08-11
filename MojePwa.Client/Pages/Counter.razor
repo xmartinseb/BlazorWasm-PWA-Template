@@ -1,7 +1,7 @@
 ﻿@* Example page, která ukazuje rozdíly mezi Local storage a Session storage *@
 @page "/counter"
 @inject BrowserStorage BrowserStorage
-
+@inject NotificationService NotificationService
 
 <PageTitle>Counter</PageTitle>
 
@@ -32,8 +32,26 @@
         if (firstRender)
         {
             // Note: Unwrap() can throw an exception.
-            currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey, fallbackValue: 0)).Unwrap();
-            currentSessionCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Session, StorageKey, fallbackValue: 0)).Unwrap();
+            // Note: fallback value is used if the key doesn't exist in the cache. Other problems (e.g. JSON deserialization) throw an exception
+
+            try
+            {
+                currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey, fallbackValue: 0)).Unwrap();
+            }
+            catch
+            {
+                NotificationService.Error("Selhalo načítání local čítače - zůstává na hodnotě 0");
+            }
+
+            try
+            {
+                currentSessionCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Session, StorageKey, fallbackValue: 0)).Unwrap();
+            }
+            catch
+            {
+                NotificationService.Error("Selhalo načítání session čítače - zůstává na hodnotě 0");
+            }
+         
             StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
         }
     }
