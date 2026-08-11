@@ -17,5 +17,6 @@ builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IFakeDataService, FakeDataService>();
 builder.Services.AddScoped<BrowserStorage>();
 builder.Services.AddScoped<BrowserTtlCache>();
+builder.Services.AddScoped<BrowserStoredValueFactory>();
 
 await builder.Build().RunAsync();

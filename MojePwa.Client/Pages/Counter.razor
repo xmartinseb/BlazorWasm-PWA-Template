@@ -1,24 +1,25 @@
 ﻿@* Example page, která ukazuje rozdíly mezi Local storage a Session storage *@
 @page "/counter"
-@inject BrowserStorage BrowserStorage
+@inject BrowserStoredValueFactory BrowserStoredValueFactory
 @inject NotificationService NotificationService
 
 <PageTitle>Counter</PageTitle>
 
 <div>
     <h2>Local storage counter (= shared, permanent)</h2>
-    <p role="status">Current local count: @currentLocalCount</p>
+    <p role="status">Current local count: @currentLocalCount?.Value</p>
     <button class="btn btn-primary" @onclick="IncrementLocalCount">Click me</button>
 </div>
 
 <div class="mt-5">
     <h2>Session storage counter (= temporary, per-tab)</h2>
-    <p role="status">Current session count: @currentSessionCount</p>
+    <p role="status">Current session count: @currentSessionCount?.Value</p>
     <button class="btn btn-primary" @onclick="IncrementSessionCount">Click me</button>
 </div>
 
 @code {
-    int currentLocalCount, currentSessionCount;
+    // Třída BrowserStoredValue umožňuje definovat cachovanou hodnotu jednou a poté manipulovat s hodnotou pomocí jednoduchých metod
+    BrowserStoredValue<int> currentLocalCount = null!, currentSessionCount = null!;
 
     /// <summary>
     /// Local a Session storage mohou mít stejné cache keys bez konfliktu, protože to jsou nezávislá úložiště.
@@ -26,45 +27,37 @@
     /// </summary>
     const string StorageKey = "counter_value";
 
+    // TODO: Lepší ošetření chyb
+
     // Načtení dat bezpečně až PO vygenerování HTML na klientovi (kvůli JS Interop / Prerenderingu)
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            // Note: Unwrap() can throw an exception.
-            // Note: fallback value is used if the key doesn't exist in the cache. Other problems (e.g. JSON deserialization) throw an exception
+        if (!firstRender)
+            return;
+     
+        currentLocalCount ??= BrowserStoredValueFactory.Create<int>(StorageKey, BrowserStorageType.Local);
+        currentSessionCount ??= BrowserStoredValueFactory.Create<int>(StorageKey, BrowserStorageType.Session);
 
-            try
-            {
-                currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey, fallbackValue: 0)).Unwrap();
-            }
-            catch
-            {
-                NotificationService.Error("Selhalo načítání local čítače - zůstává na hodnotě 0");
-            }
 
-            try
-            {
-                currentSessionCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Session, StorageKey, fallbackValue: 0)).Unwrap();
-            }
-            catch
-            {
-                NotificationService.Error("Selhalo načítání session čítače - zůstává na hodnotě 0");
-            }
-         
-            StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
-        }
+        if (await currentLocalCount.LoadAsync(0) is Result { Errors: [_, ..] } localCountErr)
+            NotificationService.Error($"Selhalo načítání local čítače: {string.Join("; ", localCountErr.Errors)}");
+
+        if (await currentSessionCount.LoadAsync(0) is Result { Errors: [_, ..] } sessionCountErr)
+            NotificationService.Error($"Selhalo načítání session čítače: {string.Join("; ", sessionCountErr.Errors)}");
+
+        StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
     }
 
     async Task IncrementLocalCount()
     {
-        currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (zabránění konfliktu)
-        await BrowserStorage.SetAsync(BrowserStorageType.Local, StorageKey, ++currentLocalCount);
+        var localValResult = await currentLocalCount.LoadAsync(0);
+        await currentLocalCount.SetAsync(localValResult.Value + 1);
     }
 
     async Task IncrementSessionCount()
     { 
-        currentLocalCount = (await BrowserStorage.TryGetAsync<int>(BrowserStorageType.Local, StorageKey)).UnwrapOr(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
-        await BrowserStorage.SetAsync(BrowserStorageType.Session, StorageKey, ++currentSessionCount);
+        var localValResult = await currentLocalCount.LoadAsync(0); // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
+        var sessionValResult = await currentSessionCount.LoadAsync();
+        await currentSessionCount.SetAsync(sessionValResult.Value + 1);
     }
 }
