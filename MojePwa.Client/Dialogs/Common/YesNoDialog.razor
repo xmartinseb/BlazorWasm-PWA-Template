@@ -1,4 +1,5 @@
-﻿@inject DialogService DialogService
+﻿@* Prostý (Common) dialog, který vrátí True, False, nebo NULL. Common dialogy nemají vnitřní logiku, ani vnější závislosti na DB apod. Slouží pouze k vrácení nějaké hodnoty *@
+@inject DialogService DialogService
 
 <RadzenStack Gap="1.5rem">
     @if (!string.IsNullOrWhiteSpace(Message))
