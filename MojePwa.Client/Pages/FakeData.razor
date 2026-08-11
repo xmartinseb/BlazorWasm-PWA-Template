@@ -5,10 +5,7 @@
 <h2>Fake Data</h2>
 <RadzenButton Click="AddFakeDataClick">Přidat fake data</RadzenButton>
 <div class="mt-5">
-    <DataComponent @ref="dataComponent" TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..."
-                   LoadFreshData="LoadFreshData" DataReloadPeriod="null" 
-                   CacheUsage="@new(TimeSpan.FromSeconds(60), BrowserStorageType.Local)">
-
+    <DataComponent @ref="dataComponent" TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..." DataSource="fakeDataSource">
         @switch (vm.FakeData.Count)
         {
             case 0:
@@ -28,6 +25,13 @@
 
 @code {
     DataComponent<ViewModel>? dataComponent;
+    DataSource<ViewModel> fakeDataSource = null!;
+
+    protected override void OnInitialized()
+    {
+        fakeDataSource = new(LoadFreshData, DataReloadPeriod: null,
+            CacheUsage: new(TimeSpan.FromSeconds(60), BrowserStorageType.Session));
+    }
 
     async Task<Result<ViewModel>> LoadFreshData()
     {

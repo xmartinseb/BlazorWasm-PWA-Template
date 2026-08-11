@@ -15,43 +15,13 @@
 </StateSwitch>
 
     @code {
-    /// <summary>
-    /// Nastavení využití cache. Nastavuje se time to live, cache key se umí vybrat automaticky: každý typ TData má svůj cache key
-    /// </summary>
-    public readonly struct CacheUseInfo
-    {
-        public CacheUseInfo(TimeSpan cacheTtl, BrowserStorageType storage, string? cacheKey = null)
-        {
-            if (cacheKey == string.Empty)
-                throw new ArgumentException("Cache key nemůže být prázdný string", nameof(cacheKey));
-            CacheTTL = cacheTtl;
-            CacheKey = cacheKey ?? typeof(TData).FullName ?? throw new InvalidOperationException("Typ nemá full name");
-            Storage = storage;
-        }
 
-        /// <summary>
-        /// Cache key se dá specifikovat explicitně, ale často není třeba. Pokud zůstane NULL, vybere se cache key automaticky
-        /// </summary>
-        public string CacheKey { get; }
-        public TimeSpan CacheTTL { get; }
-        public BrowserStorageType Storage { get; }
-    }
 
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
     [Parameter] public EventCallback OnRetry { get; set; }
-    [Parameter] public Func<Task<Result<TData>>> LoadFreshData { get; set; } = default!;
-
-    /// <summary>
-    /// Pokud není NULL, spustí se automatický timer, který bude periodicky uploadovat zobrazená data
-    /// </summary>
-    [Parameter] public TimeSpan? DataReloadPeriod { get; set; }
-
-    /// <summary>
-    /// Pokud neni NULL, datová komponenta použije local cache v browseru
-    /// </summary>
-    [Parameter] public CacheUseInfo? CacheUsage { get; set; }
+    [Parameter] public DataSource<TData> DataSource { get; set; } = null!;
 
     /// <summary>
     /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
@@ -64,25 +34,35 @@
     string? _previousCacheKey = string.Empty;
     TimeSpan? _previousReloadPeriod;
 
+    /// <summary>
+    /// Lokální viewmodel obsahující načtená data s časem načtení.
+    /// </summary>
     public class LoadedData
     {
         public required TData Data { get; set; }
+
+        /// <summary>
+        /// V případě čerstvého načtení se použíje utcNow. V případě načtení z cache se sem
+        /// propíše čas z cache.
+        /// </summary>
         public required DateTimeOffset Loaded { get; set; }
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        var currentCacheKey = CacheUsage?.CacheKey;
+        if (DataSource is null)
+            throw new ArgumentException("DataComponent nemůže mít DataSource NULL");
+        var currentCacheKey = DataSource.CacheUsage?.CacheKey;
 
-        if (CacheUsage is not null && string.IsNullOrWhiteSpace(CacheUsage.Value.CacheKey))
+        if (DataSource.CacheUsage is not null && string.IsNullOrWhiteSpace(currentCacheKey))
             throw new InvalidOperationException("Prázdný string není validní cache key.");
 
         // Reagujeme pouze na reálnou změnu CacheKey nebo na změnu periody reloadu
         bool cacheKeyChanged = _previousCacheKey != currentCacheKey;
-        bool reloadPeriodChanged = _previousReloadPeriod != DataReloadPeriod;
+        bool reloadPeriodChanged = _previousReloadPeriod != DataSource.DataReloadPeriod;
 
         _previousCacheKey = currentCacheKey;
-        _previousReloadPeriod = DataReloadPeriod;
+        _previousReloadPeriod = DataSource.DataReloadPeriod;
 
         if (cacheKeyChanged)
             await LoadAndSetGuiStateAsync();
@@ -96,33 +76,47 @@
         _cts?.Cancel();
         _cts?.Dispose();
 
-        if (DataReloadPeriod is null)
+        if (DataSource.DataReloadPeriod is null)
             return; // Periodicke nacitani neni povoleno
 
         _cts = new CancellationTokenSource();
-        var token = _cts.Token;
+        var ct = _cts.Token;
 
         _ = Task.Run(async () =>
         {
-            using var periodicTimer = new PeriodicTimer(DataReloadPeriod.Value);
+            using var periodicTimer = new PeriodicTimer(DataSource.DataReloadPeriod.Value);
 
             try
             {
-                while (await periodicTimer.WaitForNextTickAsync(token))
+                // 1. Před spuštěním pravidelného synchronizačního cyklu je lepší synchronizovat načítání s expirací cache.
+                // (Při znovuotevření stránky s touto komponentou se může načíst první náhled z cache)
+                if (DataSource.CacheUsage is { } c && GuiState is StateLoaded<LoadedData> loaded)
                 {
-                    await ReloadDataAsync(token);
+                    var nextRefreshDelay = (loaded.LoadedData.Loaded + c.CacheTTL) - DateTimeOffset.UtcNow;
+                    if (nextRefreshDelay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(nextRefreshDelay, ct);
+                        await ReloadDataAsync(ct);
+                    }
+
+                    if (c.CacheTTL == DataSource.DataReloadPeriod.Value)
+                        await Task.Delay(TimeSpan.FromMilliseconds(20), ct); // Pojistka, aby data byla expirovaná
                 }
+
+                // 2. další načítání již lze provádět v pravidelném cyklu
+                while (await periodicTimer.WaitForNextTickAsync(ct))
+                    await ReloadDataAsync(ct);
             }
             catch (OperationCanceledException)
             {
                 // Není to chyba. Je to ukončení (Dispose / Změna parametrů)
             }
-        }, token);
+        }, ct);
     }
 
     public async Task RemoveFromCacheAsync() 
     {
-        if (CacheUsage is not { } c)
+        if (DataSource.CacheUsage is not { } c)
             return;
         await BrowserTtlCache.RemoveAsync(c.Storage, c.CacheKey);
     }
@@ -146,7 +140,7 @@
             });
 
             // 2. Načtení čerstvých dat ze zdroje
-            var fresh = await LoadFreshData();
+            var fresh = await DataSource.LoadFreshData();
 
             // 3. Příprava nového stavu a zápis do cache (na pozadí, Mimo InvokeAsync!)
             LoadedData? newLoadedData = null;
@@ -156,7 +150,7 @@
             {
                 newLoadedData = new LoadedData { Data = fresh.Value, Loaded = DateTimeOffset.UtcNow };
 
-                if (CacheUsage is { } c)
+                if (DataSource.CacheUsage is { } c)
                 {
                     await BrowserTtlCache.StoreAsync(c.Storage, c.CacheKey, fresh.Value, c.CacheTTL);
                 }
@@ -210,15 +204,15 @@
 
     protected override async Task<Result<LoadedData>> LoadDataAsync()
     {
-        if (CacheUsage is { } c)
+        if (DataSource.CacheUsage is { } c)
         {
             var cached = await BrowserTtlCache.TryGetAsync<TData>(c.Storage, c.CacheKey);
             if (cached.Succeeded)
                 return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
         }
 
-        var fresh = await LoadFreshData();
-        if (fresh.Succeeded && CacheUsage is { } cu)
+        var fresh = await DataSource.LoadFreshData();
+        if (fresh.Succeeded && DataSource.CacheUsage is { } cu)
         {
             await BrowserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, fresh.Value, cu.CacheTTL);
         }

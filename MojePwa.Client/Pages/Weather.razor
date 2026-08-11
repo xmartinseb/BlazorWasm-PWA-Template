@@ -2,10 +2,7 @@
 @page "/weather"
 @inject IWeatherService WeatherService
 
-<DataComponent TData="ViewModel" Context="vm"
-               LoadFreshData="LoadFreshData" DataReloadPeriod="TimeSpan.FromSeconds(15)" 
-               CacheUsage="@new(TimeSpan.FromSeconds(15), BrowserStorageType.Session)">
-
+<DataComponent TData="ViewModel" Context="vm" DataSource="dataSource">
     <table class="table">
         <thead>
             <tr>
@@ -30,6 +27,14 @@
 </DataComponent>
 
 @code {
+    DataSource<ViewModel> dataSource = null!;
+
+    protected override void OnInitialized()
+    {
+        dataSource = new(LoadFreshData, DataReloadPeriod: TimeSpan.FromSeconds(15),
+            CacheUsage: new(TimeSpan.FromSeconds(15), BrowserStorageType.Session));
+    }
+
     async Task<Result<ViewModel>> LoadFreshData()
     {
         var forecasts = (await WeatherService.GetForecastAsync(CT.None)).Unwrap();
