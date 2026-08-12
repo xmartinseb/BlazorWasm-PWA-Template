@@ -27,19 +27,17 @@ public sealed class BrowserStoredValue<T>(BrowserStorage storage, string storage
         Value = value;
     }
 
-    // TODO: DRY!
-    public async Task<Result<T>> LoadAsync()
-    {
-        var result = await storage.TryGetAsync<T>(storageType, storageKey);
-        if (!result.Succeeded)
-            return Result.Err<T>(result.Errors);
-        Value = result.Value;
-        return Result.Ok(Value);
-    }
+    public Task<Result<T>> LoadAsync()
+        => LoadInternalAsync(false);
 
-    public async Task<Result<T>> LoadAsync(T fallbackValue)
+    public Task<Result<T>> LoadAsync(T fallbackValue)
+        => LoadInternalAsync(true, fallbackValue);
+
+    async Task<Result<T>> LoadInternalAsync(bool useFallback, T fallbackValue = default!)
     {
-        var result = await storage.TryGetAsync<T>(storageType, storageKey, fallbackValue);
+        var result = useFallback
+            ? await storage.TryGetAsync(storageType, storageKey, fallbackValue)
+            : await storage.TryGetAsync<T>(storageType, storageKey);
         if (!result.Succeeded)
             return Result.Err<T>(result.Errors);
         Value = result.Value;

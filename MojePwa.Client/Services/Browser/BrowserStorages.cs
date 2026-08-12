@@ -105,8 +105,8 @@ public sealed class BrowserTtlCache(BrowserStorage storage)
         return Result.Ok(entry);
     }
 
-    public ValueTask RemoveAsync(BrowserStorageType s, string cacheKey)
-        => storage.RemoveAsync(s, cacheKey);
+    public ValueTask RemoveAsync(BrowserStorageType s, string key)
+        => storage.RemoveAsync(s, key);
 }
 
 
