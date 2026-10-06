@@ -5,7 +5,7 @@
 <h2>Fake Data</h2>
 <RadzenButton Click="AddFakeDataClick">Přidat fake data</RadzenButton>
 <div class="mt-5">
-    <DataComponent @ref="dataComponent" TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..." DataSource="fakeDataSource">
+    <DataComponent TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..." DataSource="fakeDataSource">
         @switch (vm.FakeData.Count)
         {
             case 0:
@@ -24,7 +24,6 @@
 </div>
 
 @code {
-    DataComponent<ViewModel>? dataComponent;
     DataSource<ViewModel> fakeDataSource = null!;
 
     protected override void OnInitialized()
@@ -46,6 +45,6 @@
     {
         var result = await AddFakeDataDialog.ShowAsync(DialogService);
         if (result is true)
-            await dataComponent!.ReloadDataAsync(CT.None);
+            fakeDataSource.RequestReload();
     }
 }

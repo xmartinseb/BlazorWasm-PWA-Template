@@ -52,6 +52,9 @@
     {
         if (DataSource is null)
             throw new ArgumentException("DataComponent nemůže mít DataSource NULL");
+
+        DataSource.ReloadRequested += OnReloadRequested;
+
         var currentCacheKey = DataSource.CacheUsage?.CacheKey;
 
         if (DataSource.CacheUsage is not null && string.IsNullOrWhiteSpace(currentCacheKey))
@@ -69,6 +72,12 @@
 
         if (reloadPeriodChanged || cacheKeyChanged)
             StartPeriodicReload();
+    }
+
+    async void OnReloadRequested(object? sender, EventArgs e)
+    {
+        await InvokeAsync(() => ReloadDataAsync(CT.None));
+        StateHasChanged();
     }
 
     void StartPeriodicReload()
@@ -222,6 +231,7 @@
 
     public void Dispose()
     {
+        DataSource?.ReloadRequested -= OnReloadRequested;
         _cts?.Cancel();
         _cts?.Dispose();
         _reloadLock.Dispose();

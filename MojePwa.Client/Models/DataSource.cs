@@ -8,7 +8,12 @@ namespace MojePwa.Client.Models;
 /// Definuje načítací proceduru dat, využití cache a nastavení periodického reloadu.
 /// </summary>
 /// <typeparam name="TData">Typ načítaných dat. Jeho Fullname se defaultně použije jako cache key</typeparam>
-public sealed record DataSource<TData>(Func<Task<Result<TData>>> LoadFreshData, TimeSpan? DataReloadPeriod = null, BrowserCacheUsage<TData>? CacheUsage = null);
+public sealed record DataSource<TData>(Func<Task<Result<TData>>> LoadFreshData, TimeSpan? DataReloadPeriod = null, BrowserCacheUsage<TData>? CacheUsage = null)
+{
+    public void RequestReload() => ReloadRequested?.Invoke(this, EventArgs.Empty);
+
+    public event EventHandler? ReloadRequested;
+}
 
 /// <summary>
 /// Nastavení využití cache. Nastavuje se time to live, cache key se umí vybrat automaticky (TData type fullname)
