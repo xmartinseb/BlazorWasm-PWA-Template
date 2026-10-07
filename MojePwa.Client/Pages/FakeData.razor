@@ -24,6 +24,8 @@
 </div>
 
 @code {
+    public sealed record ViewModel(Dictionary<string, string> FakeData);
+
     DataSource<ViewModel> fakeDataSource = null!;
 
     protected override void OnInitialized()
@@ -38,8 +40,6 @@
         var newDataVm = new ViewModel(newData);
         return Result.Ok(newDataVm);
     }
-
-    public sealed record ViewModel(Dictionary<string, string> FakeData);
 
     async Task AddFakeDataClick()
     {

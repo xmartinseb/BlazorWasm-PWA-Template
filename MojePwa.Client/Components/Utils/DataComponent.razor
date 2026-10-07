@@ -15,8 +15,6 @@
 </StateSwitch>
 
     @code {
-
-
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
@@ -74,6 +72,9 @@
             StartPeriodicReload();
     }
 
+    /// <summary>
+    /// Volá se jako událost poté, co uživatel změnil nějaká data a systém byl požádán o znovunačtení datové komponenty
+    /// </summary>
     async void OnReloadRequested(object? sender, EventArgs e)
     {
         await InvokeAsync(() => ReloadDataAsync(CT.None));

@@ -16,6 +16,11 @@ public abstract class ComponentWithGuiState<TDataLoaded> : ComponentBase
     /// </summary>
     protected IGuiState? GuiState { get; set; }
 
+    /// <summary>
+    /// Funkce pro pouhé načtení dat, typicky pomocí services.
+    /// Nemělo by to házet výjimky (kromě UserFriendlyServiceFailException)
+    /// </summary>
+    /// <returns>Result OK nebo Error</returns>
     protected abstract Task<Result<TDataLoaded>> LoadDataAsync();
 
     [Parameter] public string LoadingMessage { get; set; } = "Loading";
