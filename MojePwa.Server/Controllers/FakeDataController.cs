@@ -4,7 +4,7 @@ using MojePwa.Server.Data;
 namespace MojePwa.Server.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/[controller]")]
 public class FakeDataController(FakeDb fakeDb) : ControllerBase
 {
     [HttpGet(Name = "GetAllData")]
