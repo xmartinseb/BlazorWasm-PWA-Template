@@ -83,6 +83,11 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
         }
     }
 
+    public TDataLoaded? TryGetLoadedData() 
+        => GuiState is StateLoaded<DataWithTimestamp<TDataLoaded>> loaded 
+            ? loaded.LoadedData.Data 
+            : default;
+
     async Task<Result<DataWithTimestamp<TDataLoaded>>> LoadFromCacheOrLoadFresh(CT ct)
     {
         if (CacheUsage is { } c && browserTtlCache is not null)

@@ -21,7 +21,7 @@
                 break;
         }
 
-        <RadzenButton Click="() => AddFakeDataClick(vm)" class="mt-5">Přidat fake data</RadzenButton>
+        <RadzenButton Click="AddFakeDataClick" class="mt-5">Přidat fake data</RadzenButton>
     </DataComponent>
 </div>
 
@@ -41,12 +41,13 @@
 
     protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, FakeDataService);
 
-    async Task AddFakeDataClick(LoadedDataVm vm)
+    async Task AddFakeDataClick()
     {
-        if (await AddFakeDataDialog.ShowAsync(DialogService) is { } dialogResult)
+        if (await AddFakeDataDialog.ShowAsync(DialogService) is { } dialogResult
+            && DataViewModel?.TryGetLoadedData() is { } loadedData)
         {
-            vm.FakeData[dialogResult.NewKey] = dialogResult.NewValue;
-            await DataViewModel!.StoreCacheAsync(vm, CT.None);
+            loadedData.FakeData[dialogResult.NewKey] = dialogResult.NewValue;
+            await DataViewModel!.StoreCacheAsync(loadedData, CT.None);
         }
     }
 }
