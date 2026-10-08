@@ -23,7 +23,7 @@
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
             <RadzenButton Text="Zrušit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
-                          Click="@(() => DialogService.Close(false))" Disabled="busy" />
+                          Click="@(() => DialogService.Close(null))" Disabled="busy" />
             <RadzenButton ButtonType="ButtonType.Submit" Text="Uložit" ButtonStyle="ButtonStyle.Primary"
                           Icon="save" IsBusy="busy" BusyText="Ukládám…" />
         </RadzenStack>
@@ -33,6 +33,8 @@
 @code {
     [Parameter]
     public ViewModel NewFakeDataVm { get; set; } = new();
+
+    public readonly record struct AddFakeDataDialogResult(string NewKey, string NewValue);
 
     bool busy;
 
@@ -46,7 +48,7 @@
             if (result.Succeeded)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Uloženo", "Fake data byla nahrána na server");
-                DialogService.Close(true);
+                DialogService.Close(new AddFakeDataDialogResult(NewFakeDataVm.Key, NewFakeDataVm.Value));
             }
             else
             {
@@ -60,14 +62,15 @@
         }
     }
 
-    public static async Task<bool> ShowAsync(DialogService dialogService)
+    public static async Task<AddFakeDataDialogResult?> ShowAsync(DialogService dialogService)
     {
         var title = "Přidat fake data";
         var result = await dialogService.OpenAsync<AddFakeDataDialog>(title, new Dictionary<string, object?>
         {
             // Sem se doplni parametry, pokud budou potreba
         });
-        return result is true;
+
+        return result;
     }
 
     public class ViewModel
@@ -75,7 +78,7 @@
         [Required]
         [StringLength(16)]
         public string Key { get; set; } = "";
-        
+
         [Required]
         [StringLength(128)]
         public string Value { get; set; } = "";

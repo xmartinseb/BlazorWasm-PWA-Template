@@ -1,240 +1,65 @@
 ﻿@typeparam TData
-@inherits ComponentWithGuiState<DataComponent<TData>.LoadedData>
 @implements IDisposable
-@inject BrowserTtlCache BrowserTtlCache
 
-<StateSwitch TData="LoadedData" Context="data" State="GuiState" LoadingContent="LoadingContent"
-             ErrorContent="ErrorContent" OnRetry="OnRetry">
-    @ChildContent?.Invoke(data.Data)
-    @if (ShowTimestamp)
-    {
-        <div>
-            <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
-        </div>
-    }
-</StateSwitch>
+@if (ViewModel is { GuiState: not null })
+{
+    <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
+                 ErrorContent="ErrorContent" OnRetry="() => ViewModel.OnRetryClickAsync()">
+        @ChildContent?.Invoke(data.Data)
+        @if (ShowTimestamp)
+        {
+            <div>
+                <b>Čas načtení: </b> @data.Loaded.ToLocalTime().ToString("HH:mm:ss")
+            </div>
+        }
+    </StateSwitch>
+}
 
-    @code {
+@code {
     [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
-    [Parameter] public EventCallback OnRetry { get; set; }
-    [Parameter] public DataSource<TData> DataSource { get; set; } = null!;
+    [Parameter] public DataViewModel<TData> ViewModel { get; set; } = null!;
 
     /// <summary>
     /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
     /// </summary>
     [Parameter] public bool ShowTimestamp { get; set; } = true;
 
-    CancellationTokenSource? _cts;
-    readonly SemaphoreSlim _reloadLock = new(1, 1);
-
-    string? _previousCacheKey = string.Empty;
-    TimeSpan? _previousReloadPeriod;
-
-    /// <summary>
-    /// Lokální viewmodel obsahující načtená data s časem načtení.
-    /// </summary>
-    public class LoadedData
-    {
-        public required TData Data { get; set; }
-
-        /// <summary>
-        /// V případě čerstvého načtení se použíje utcNow. V případě načtení z cache se sem
-        /// propíše čas z cache.
-        /// </summary>
-        public required DateTimeOffset Loaded { get; set; }
-    }
-
     protected override async Task OnParametersSetAsync()
     {
-        if (DataSource is null)
-            throw new ArgumentException("DataComponent nemůže mít DataSource NULL");
+        if (ViewModel is null)
+            throw new ArgumentException("DataComponent nemůže mít ViewModel NULL");
 
-        DataSource.ReloadRequested += OnReloadRequested;
+        if (ReferenceEquals(_subscribed, ViewModel))
+            return;
 
-        var currentCacheKey = DataSource.CacheUsage?.CacheKey;
+        if (_subscribed is not null)
+        {
+            _subscribed.BlazorStateHasChanged -= OnBlazorStateHasChanged;
+            _subscribed.StopPeriodicReload();
+        }
+        _subscribed = ViewModel;
+        ViewModel.BlazorStateHasChanged += OnBlazorStateHasChanged;
 
-        if (DataSource.CacheUsage is not null && string.IsNullOrWhiteSpace(currentCacheKey))
+        var currentCacheKey = ViewModel.CacheUsage?.CacheKey;
+
+        if (ViewModel.CacheUsage is not null && string.IsNullOrWhiteSpace(currentCacheKey))
             throw new InvalidOperationException("Prázdný string není validní cache key.");
 
-        // Reagujeme pouze na reálnou změnu CacheKey nebo na změnu periody reloadu
-        bool cacheKeyChanged = _previousCacheKey != currentCacheKey;
-        bool reloadPeriodChanged = _previousReloadPeriod != DataSource.DataReloadPeriod;
-
-        _previousCacheKey = currentCacheKey;
-        _previousReloadPeriod = DataSource.DataReloadPeriod;
-
-        if (cacheKeyChanged)
-            await LoadAndSetGuiStateAsync();
-
-        if (reloadPeriodChanged || cacheKeyChanged)
-            StartPeriodicReload();
+        if (ViewModel.DataReloadPeriod is not null)
+            ViewModel.StartPeriodicReload();
+        else
+            await ViewModel.LoadAndSetGuiStateAsync("Loading...", CT.None);
     }
 
-    /// <summary>
-    /// Volá se jako událost poté, co uživatel změnil nějaká data a systém byl požádán o znovunačtení datové komponenty
-    /// </summary>
-    async void OnReloadRequested(object? sender, EventArgs e)
+    DataViewModel<TData>? _subscribed;
+
+    async void OnBlazorStateHasChanged(object? sender, EventArgs e) => await InvokeAsync(StateHasChanged);
+
+    public void Dispose() 
     {
-        await InvokeAsync(() => ReloadDataAsync(CT.None));
-        StateHasChanged();
-    }
-
-    void StartPeriodicReload()
-    {
-        _cts?.Cancel();
-        _cts?.Dispose();
-
-        if (DataSource.DataReloadPeriod is null)
-            return; // Periodicke nacitani neni povoleno
-
-        _cts = new CancellationTokenSource();
-        var ct = _cts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            using var periodicTimer = new PeriodicTimer(DataSource.DataReloadPeriod.Value);
-
-            try
-            {
-                // 1. Před spuštěním pravidelného synchronizačního cyklu je lepší synchronizovat načítání s expirací cache.
-                // (Při znovuotevření stránky s touto komponentou se může načíst první náhled z cache)
-                if (DataSource.CacheUsage is { } c && GuiState is StateLoaded<LoadedData> loaded)
-                {
-                    var nextRefreshDelay = (loaded.LoadedData.Loaded + c.CacheTTL) - DateTimeOffset.UtcNow;
-                    if (nextRefreshDelay > TimeSpan.Zero)
-                    {
-                        await Task.Delay(nextRefreshDelay, ct);
-                        await ReloadDataAsync(ct);
-                    }
-
-                    if (c.CacheTTL == DataSource.DataReloadPeriod.Value)
-                        await Task.Delay(TimeSpan.FromMilliseconds(20), ct); // Pojistka, aby data byla expirovaná
-                }
-
-                // 2. další načítání již lze provádět v pravidelném cyklu
-                while (await periodicTimer.WaitForNextTickAsync(ct))
-                    await ReloadDataAsync(ct);
-            }
-            catch (OperationCanceledException)
-            {
-                // Není to chyba. Je to ukončení (Dispose / Změna parametrů)
-            }
-        }, ct);
-    }
-
-    public async Task RemoveFromCacheAsync() 
-    {
-        if (DataSource.CacheUsage is not { } c)
-            return;
-        await BrowserTtlCache.RemoveAsync(c.Storage, c.CacheKey);
-    }
-
-    // Periodický reload dat na pozadí. Pokud stále probíhá předchozí reload, tak se další nespustí.
-    public async Task ReloadDataAsync(CT ct)
-    {
-        if (!await _reloadLock.WaitAsync(0, ct))
-            return;
-
-        try
-        {
-            if (GuiState is not StateLoaded<LoadedData> loaded)
-                return;
-
-            // 1. Překlopení UI indikátoru načítání
-            await InvokeAsync(() =>
-            {
-                loaded.IsReloading = true;
-                StateHasChanged();
-            });
-
-            // 2. Načtení čerstvých dat ze zdroje
-            var fresh = await DataSource.LoadFreshData();
-
-            // 3. Příprava nového stavu a zápis do cache (na pozadí, Mimo InvokeAsync!)
-            LoadedData? newLoadedData = null;
-            StateError? newError = null;
-
-            if (fresh.Succeeded)
-            {
-                newLoadedData = new LoadedData { Data = fresh.Value, Loaded = DateTimeOffset.UtcNow };
-
-                if (DataSource.CacheUsage is { } c)
-                {
-                    await BrowserTtlCache.StoreAsync(c.Storage, c.CacheKey, fresh.Value, c.CacheTTL);
-                }
-            }
-            else
-            {
-                newError = new StateError(fresh.Errors);
-            }
-
-            // 4. Přepnutí do nového stavu UI
-            await InvokeAsync(() =>
-            {
-                if (newLoadedData != null)
-                    loaded.LoadedData = newLoadedData;
-                else if (newError != null)
-                    GuiState = newError;
-                StateHasChanged(); // Vynutí překreslení s novými daty!
-            });
-        }
-        catch (UserFriendlyServiceFailException ex)
-        {
-            await InvokeAsync(() =>
-            {
-                GuiState = new StateError(ex.Errors);
-                StateHasChanged();
-            });
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine(ex);
-            await InvokeAsync(() =>
-            {
-                GuiState = new StateError("Unexpected error occurred");
-                StateHasChanged();
-            });
-        }
-        finally
-        {
-            if (GuiState is StateLoaded<LoadedData> loadedAfter)
-            {
-                await InvokeAsync(() =>
-                {
-                    loadedAfter.IsReloading = false;
-                    StateHasChanged();
-                });
-            }
-
-            _reloadLock.Release();
-        }
-    }
-
-    protected override async Task<Result<LoadedData>> LoadDataAsync()
-    {
-        if (DataSource.CacheUsage is { } c)
-        {
-            var cached = await BrowserTtlCache.TryGetAsync<TData>(c.Storage, c.CacheKey);
-            if (cached.Succeeded)
-                return Result.Ok(new LoadedData { Data = cached.Value.CachedValue, Loaded = cached.Value.Stored });
-        }
-
-        var fresh = await DataSource.LoadFreshData();
-        if (fresh.Succeeded && DataSource.CacheUsage is { } cu)
-        {
-            await BrowserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, fresh.Value, cu.CacheTTL);
-        }
-
-        return fresh.MapValue(_fresh => new LoadedData { Data = _fresh, Loaded = DateTimeOffset.UtcNow });
-    }
-
-    public void Dispose()
-    {
-        DataSource?.ReloadRequested -= OnReloadRequested;
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _reloadLock.Dispose();
+        ViewModel.BlazorStateHasChanged -= OnBlazorStateHasChanged;
+        ViewModel.StopPeriodicReload();
     }
 }

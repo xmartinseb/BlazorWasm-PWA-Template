@@ -1,8 +1,10 @@
 ﻿@* This component demonstrates fetching data from the server via services *@
 @page "/weather"
 @inject IWeatherService WeatherService
+@inject BrowserTtlCache BrowserTtlCache
 
-<DataComponent TData="ViewModel" Context="vm" DataSource="dataSource">
+<h2>Weather</h2>
+<DataComponent TData="LoadedDataVm" ViewModel="DataViewModel" Context="vm">
     <table class="table">
         <thead>
             <tr>
@@ -27,19 +29,18 @@
 </DataComponent>
 
 @code {
-    DataSource<ViewModel> dataSource = null!;
+    WeatherDataViewModel? DataViewModel { get; set; }
 
-    protected override void OnInitialized()
+    sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm>(
+            dataReloadPeriod: TimeSpan.FromSeconds(2),
+            cacheUsage: new(TimeSpan.FromSeconds(2), BrowserStorageType.Session, cacheKey: "WEATHER"),
+            cache)
     {
-        dataSource = new(LoadFreshData, DataReloadPeriod: TimeSpan.FromSeconds(15),
-            CacheUsage: new(TimeSpan.FromSeconds(15), BrowserStorageType.Session));
+        public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
+            => Result.Ok(new LoadedDataVm((await weatherService.GetForecastAsync(CT.None)).Unwrap()));
     }
 
-    async Task<Result<ViewModel>> LoadFreshData()
-    {
-        var forecasts = (await WeatherService.GetForecastAsync(CT.None)).Unwrap();
-        return Result.Ok(new ViewModel(forecasts));
-    }
+    sealed record LoadedDataVm(WeatherForecast[] Forecasts);
 
-    public sealed record ViewModel(WeatherForecast[] Forecasts);
-} 
+    protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, WeatherService);
+}

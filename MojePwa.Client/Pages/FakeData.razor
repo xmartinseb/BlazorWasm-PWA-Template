@@ -1,11 +1,11 @@
 ﻿@page "/fake-data"
 @inject IFakeDataService FakeDataService
+@inject BrowserTtlCache BrowserTtlCache
 @inject DialogService DialogService
 
 <h2>Fake Data</h2>
-<RadzenButton Click="AddFakeDataClick">Přidat fake data</RadzenButton>
-<div class="mt-5">
-    <DataComponent TData="ViewModel" Context="vm" LoadingMessage="Načítám fake data..." DataSource="fakeDataSource">
+<div>
+    <DataComponent TData="LoadedDataVm" ViewModel="DataViewModel" Context="vm">
         @switch (vm.FakeData.Count)
         {
             case 0:
@@ -20,31 +20,33 @@
                 }
                 break;
         }
+
+        <RadzenButton Click="() => AddFakeDataClick(vm)" class="mt-5">Přidat fake data</RadzenButton>
     </DataComponent>
 </div>
 
 @code {
-    public sealed record ViewModel(Dictionary<string, string> FakeData);
+    FakeDataViewModel? DataViewModel { get; set; }
 
-    DataSource<ViewModel> fakeDataSource = null!;
-
-    protected override void OnInitialized()
+    sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<LoadedDataVm>(
+        dataReloadPeriod: TimeSpan.FromSeconds(5),
+        cacheUsage: new(TimeSpan.FromSeconds(3), BrowserStorageType.Session, cacheKey: "FAKE_DATA"),
+        cache)
     {
-        fakeDataSource = new(LoadFreshData, DataReloadPeriod: null,
-            CacheUsage: new(TimeSpan.FromSeconds(60), BrowserStorageType.Session));
+        public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
+            => Result.Ok(new LoadedDataVm((await fakeDataService.GetAllDataAsync(CT.None)).Unwrap()));
     }
 
-    async Task<Result<ViewModel>> LoadFreshData()
-    {
-        var newData = (await FakeDataService.GetAllDataAsync(CT.None)).Unwrap();
-        var newDataVm = new ViewModel(newData);
-        return Result.Ok(newDataVm);
-    }
+    sealed record LoadedDataVm(Dictionary<string, string> FakeData);
 
-    async Task AddFakeDataClick()
+    protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, FakeDataService);
+
+    async Task AddFakeDataClick(LoadedDataVm vm)
     {
-        var result = await AddFakeDataDialog.ShowAsync(DialogService);
-        if (result is true)
-            fakeDataSource.RequestReload();
+        if (await AddFakeDataDialog.ShowAsync(DialogService) is { } dialogResult)
+        {
+            vm.FakeData[dialogResult.NewKey] = dialogResult.NewValue;
+            await DataViewModel!.StoreCacheAsync(vm, CT.None);
+        }
     }
 }
