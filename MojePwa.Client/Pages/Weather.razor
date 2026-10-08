@@ -32,8 +32,8 @@
     WeatherDataViewModel? DataViewModel { get; set; }
 
     sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm>(
-            dataReloadPeriod: TimeSpan.FromSeconds(2),
-            cacheUsage: new(TimeSpan.FromSeconds(2), BrowserStorageType.Session, cacheKey: "WEATHER"),
+            dataReloadPeriod: TimeSpan.FromSeconds(10),
+            cacheUsage: new(TimeSpan.FromSeconds(7), BrowserStorageType.Session, cacheKey: "WEATHER"),
             cache)
     {
         public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
