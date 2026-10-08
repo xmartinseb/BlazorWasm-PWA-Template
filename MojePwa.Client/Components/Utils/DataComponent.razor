@@ -3,8 +3,8 @@
 
 @if (ViewModel is { GuiState: not null })
 {
-    <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
-                 ErrorContent="ErrorContent" OnRetry="() => ViewModel.OnRetryClickAsync()">
+        <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
+                     ErrorContent="ErrorContent" OnRetry="OnRetryAsync">
         @ChildContent?.Invoke(data.Data)
         @if (ShowTimestamp)
         {
@@ -39,6 +39,9 @@
             _subscribed.BlazorStateHasChanged -= OnBlazorStateHasChanged;
             _subscribed.StopPeriodicReload();
         }
+        _lifetimeCts?.Cancel();
+        _lifetimeCts?.Dispose();
+        _lifetimeCts = new();
         _subscribed = ViewModel;
         ViewModel.BlazorStateHasChanged += OnBlazorStateHasChanged;
 
@@ -50,16 +53,24 @@
         if (ViewModel.DataReloadPeriod is not null)
             ViewModel.StartPeriodicReload();
         else
-            await ViewModel.LoadAndSetGuiStateAsync("Loading...", CT.None);
+            await ViewModel.LoadAndSetGuiStateAsync("Loading...", _lifetimeCts.Token);
     }
 
     DataViewModel<TData>? _subscribed;
+    CancellationTokenSource? _lifetimeCts;
+
+    Task OnRetryAsync() => ViewModel.OnRetryClickAsync(_lifetimeCts!.Token);
 
     async void OnBlazorStateHasChanged(object? sender, EventArgs e) => await InvokeAsync(StateHasChanged);
 
     public void Dispose() 
     {
-        ViewModel.BlazorStateHasChanged -= OnBlazorStateHasChanged;
-        ViewModel.StopPeriodicReload();
+        if (_subscribed is not null)
+        {
+            _subscribed.BlazorStateHasChanged -= OnBlazorStateHasChanged;
+            _subscribed.StopPeriodicReload();
+        }
+        _lifetimeCts?.Cancel();
+        _lifetimeCts?.Dispose();
     }
 }

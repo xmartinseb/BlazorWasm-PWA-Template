@@ -37,7 +37,7 @@
             cache)
     {
         public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
-            => Result.Ok(new LoadedDataVm((await weatherService.GetForecastAsync(CT.None)).Unwrap()));
+            => Result.Ok(new LoadedDataVm((await weatherService.GetForecastAsync(ct)).Unwrap()));
     }
 
     sealed record LoadedDataVm(WeatherForecast[] Forecasts);

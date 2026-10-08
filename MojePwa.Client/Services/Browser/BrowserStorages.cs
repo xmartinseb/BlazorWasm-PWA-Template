@@ -21,28 +21,34 @@ public sealed class BrowserStorage(IJSRuntime js)
 {
     static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
-    public ValueTask SetAsync<T>(BrowserStorageType s, string key, T value)
+    public ValueTask SetAsync<T>(BrowserStorageType s, string key, T value, CT ct = default)
     {
         var json = JsonSerializer.Serialize(value, Options);
-        return js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", key, json);
+        return js.InvokeVoidAsync($"{GetStorageName(s)}.setItem", ct, key, json);
     }
 
     /// <summary>
     /// Pokusí se načíst hodnotu z úložiště prohlížeče. Pokud daný klíč neexistuje, vrátí fallback value. Pokud selže deserializace, vrátí result Err.
     /// </summary>
     public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, T fallbackValue)
-        => TryGetAsync<T>(s, key, true, fallbackValue);
+        => TryGetAsync<T>(s, key, true, fallbackValue, CT.None);
+
+    public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, T fallbackValue, CT ct)
+        => TryGetAsync<T>(s, key, true, fallbackValue, ct);
 
     /// <summary>
     /// Pokusí se načíst hodnotu z úložiště prohlížeče. Pokud daný klíč neexistuje, nebo selže deserializace, vrátí result Err.
     /// </summary>
     public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key)
-        => TryGetAsync<T>(s, key, false, default!);
+        => TryGetAsync<T>(s, key, false, default!, CT.None);
+
+    public Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, CT ct)
+        => TryGetAsync<T>(s, key, false, default!, ct);
 
     // Společný logický základ pro obě varianty
-    async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, bool useFallbackValue, T fallbackValue)
+    async Task<Result<T>> TryGetAsync<T>(BrowserStorageType s, string key, bool useFallbackValue, T fallbackValue, CT ct)
     {
-        if (await js.InvokeAsync<string?>($"{GetStorageName(s)}.getItem", key) is not string json)
+        if (await js.InvokeAsync<string?>($"{GetStorageName(s)}.getItem", ct, key) is not string json)
         {
             if (useFallbackValue)
                 return Result.Ok(fallbackValue);
@@ -63,11 +69,11 @@ public sealed class BrowserStorage(IJSRuntime js)
         }
     }
 
-    public ValueTask RemoveAsync(BrowserStorageType s, string key)
-        => js.InvokeVoidAsync($"{GetStorageName(s)}.removeItem", key);
+    public ValueTask RemoveAsync(BrowserStorageType s, string key, CT ct = default)
+        => js.InvokeVoidAsync($"{GetStorageName(s)}.removeItem", ct, key);
 
-    public ValueTask ClearAsync(BrowserStorageType s)
-        => js.InvokeVoidAsync($"{GetStorageName(s)}.clear");
+    public ValueTask ClearAsync(BrowserStorageType s, CT ct = default)
+        => js.InvokeVoidAsync($"{GetStorageName(s)}.clear", ct);
 
     static string GetStorageName(BrowserStorageType s) => s switch
     {
@@ -84,29 +90,29 @@ public sealed class BrowserStorage(IJSRuntime js)
 /// </summary>
 public sealed class BrowserTtlCache(BrowserStorage storage)
 {
-    public ValueTask StoreAsync<T>(BrowserStorageType s, string key, T value, TimeSpan ttl)
+    public ValueTask StoreAsync<T>(BrowserStorageType s, string key, T value, TimeSpan ttl, CT ct = default)
     {
         var entry = new BrowserCacheEntry<T>(value, DateTimeOffset.UtcNow, ttl);
-        return storage.SetAsync(s, key, entry);
+        return storage.SetAsync(s, key, entry, ct);
     }
 
-    public async Task<Result<BrowserCacheEntry<T>>> TryGetAsync<T>(BrowserStorageType s, string key, bool readExpiredEnabled = false)
+    public async Task<Result<BrowserCacheEntry<T>>> TryGetAsync<T>(BrowserStorageType s, string key, bool readExpiredEnabled = false, CT ct = default)
     {
-        var result = await storage.TryGetAsync<BrowserCacheEntry<T>>(s, key);
+        var result = await storage.TryGetAsync<BrowserCacheEntry<T>>(s, key, ct);
         if (!result.Succeeded)
             return Result.Err<BrowserCacheEntry<T>>(result.Errors);
         var entry = result.Value;
         if (!readExpiredEnabled && entry.IsExpired)
         {
-            await storage.RemoveAsync(s, key);
+            await storage.RemoveAsync(s, key, ct);
             return Result.Err<BrowserCacheEntry<T>>("Cache expired");
         }
 
         return Result.Ok(entry);
     }
 
-    public ValueTask RemoveAsync(BrowserStorageType s, string key)
-        => storage.RemoveAsync(s, key);
+    public ValueTask RemoveAsync(BrowserStorageType s, string key, CT ct = default)
+        => storage.RemoveAsync(s, key, ct);
 }
 
 

@@ -1,4 +1,5 @@
 ﻿@page "/fake-data"
+@implements IDisposable
 @inject IFakeDataService FakeDataService
 @inject BrowserTtlCache BrowserTtlCache
 @inject DialogService DialogService
@@ -27,6 +28,7 @@
 
 @code {
     FakeDataViewModel? DataViewModel { get; set; }
+    readonly CancellationTokenSource _lifetimeCts = new();
 
     sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<LoadedDataVm>(
         dataReloadPeriod: TimeSpan.FromSeconds(5),
@@ -34,7 +36,7 @@
         cache)
     {
         public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
-            => Result.Ok(new LoadedDataVm((await fakeDataService.GetAllDataAsync(CT.None)).Unwrap()));
+            => Result.Ok(new LoadedDataVm((await fakeDataService.GetAllDataAsync(ct)).Unwrap()));
     }
 
     sealed record LoadedDataVm(Dictionary<string, string> FakeData);
@@ -47,7 +49,13 @@
             && DataViewModel?.TryGetLoadedData() is { } loadedData)
         {
             loadedData.FakeData[dialogResult.NewKey] = dialogResult.NewValue;
-            await DataViewModel!.StoreCacheAsync(loadedData, CT.None);
+            await DataViewModel!.StoreCacheAsync(loadedData, _lifetimeCts.Token);
         }
+    }
+
+    public void Dispose()
+    {
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
     }
 }

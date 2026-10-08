@@ -35,7 +35,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     /// </summary>
     public abstract Task<Result<TDataLoaded>> LoadFreshDataAsync(CT ct);
 
-    public Task OnRetryClickAsync() => LoadAndSetGuiStateAsync("loading...", CT.None);
+    public Task OnRetryClickAsync(CT ct) => LoadAndSetGuiStateAsync("loading...", ct);
 
     /// <summary>
     /// Načtení dat a přepínání stavů GUI
@@ -57,7 +57,11 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
             else
                 GuiState = new StateError(result.Errors);
         }
-        catch (OperationCanceledException) { throw; }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException)
+        {
+            GuiState = new StateError("Požadavek byl neočekávaně zrušen.");
+        }
         catch (UserFriendlyServiceFailException ex)
         {
             GuiState = new StateError(ex.Errors);
@@ -92,14 +96,14 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     {
         if (CacheUsage is { } c && browserTtlCache is not null)
         {
-            var cached = await browserTtlCache.TryGetAsync<TDataLoaded>(c.Storage, c.CacheKey);
+            var cached = await browserTtlCache.TryGetAsync<TDataLoaded>(c.Storage, c.CacheKey, ct: ct);
             if (cached.Succeeded)
                 return Result.Ok(new DataWithTimestamp<TDataLoaded>(cached.Value.CachedValue, cached.Value.Stored));
         }
 
         var fresh = await LoadFreshDataAsync(ct);
         if (fresh.Succeeded && CacheUsage is { } cu && browserTtlCache is not null)
-            await browserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, fresh.Value, cu.CacheTTL);
+            await browserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, fresh.Value, cu.CacheTTL, ct);
 
         return fresh.MapValue(_fresh => new DataWithTimestamp<TDataLoaded>(_fresh, DateTimeOffset.UtcNow));
     }
@@ -130,7 +134,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
                 await Task.Delay(GetNextDelay(), ct);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
     TimeSpan GetNextDelay()
@@ -149,9 +153,8 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     /// </summary>
     public async Task StoreCacheAsync(TDataLoaded modifiedData, CT ct)
     {
-        // TODO: use CT in caches?
         if (CacheUsage is { } cu && browserTtlCache is not null)
-            await browserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, modifiedData, cu.CacheTTL);
+            await browserTtlCache.StoreAsync(cu.Storage, cu.CacheKey, modifiedData, cu.CacheTTL, ct);
     }
 }
 

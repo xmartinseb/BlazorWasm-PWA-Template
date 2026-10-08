@@ -1,4 +1,5 @@
 ﻿@using System.ComponentModel.DataAnnotations
+@implements IDisposable
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject IFakeDataService FakeDataService
@@ -37,13 +38,14 @@
     public readonly record struct AddFakeDataDialogResult(string NewKey, string NewValue);
 
     bool busy;
+    readonly CancellationTokenSource _cts = new();
 
     async Task SubmitAsync()
     {
         busy = true;
         try
         {
-            var result = await FakeDataService.AddFakeDataAsync(NewFakeDataVm.Key, NewFakeDataVm.Value, CT.None);
+            var result = await FakeDataService.AddFakeDataAsync(NewFakeDataVm.Key, NewFakeDataVm.Value, _cts.Token);
 
             if (result.Succeeded)
             {
@@ -56,10 +58,19 @@
                 NotificationService.Notify(NotificationSeverity.Error, "Uložení fake dat selhalo", string.Join(" ", result.Errors));
             }
         }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+        }
         finally
         {
             busy = false;
         }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
     }
 
     public static async Task<AddFakeDataDialogResult?> ShowAsync(DialogService dialogService)

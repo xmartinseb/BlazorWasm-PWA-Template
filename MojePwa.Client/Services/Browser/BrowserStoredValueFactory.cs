@@ -21,23 +21,26 @@ public sealed class BrowserStoredValue<T>(BrowserStorage storage, string storage
 {
     public T? Value { get; private set; } = default;
 
-    public async Task SetAsync(T value)
+    public async Task SetAsync(T value, CT ct = default)
     {
-        await storage.SetAsync(storageType, storageKey, value);
+        await storage.SetAsync(storageType, storageKey, value, ct);
         Value = value;
     }
 
     public Task<Result<T>> LoadAsync()
-        => LoadInternalAsync(false);
+        => LoadInternalAsync(false, default!, CT.None);
 
-    public Task<Result<T>> LoadAsync(T fallbackValue)
-        => LoadInternalAsync(true, fallbackValue);
+    public Task<Result<T>> LoadAsync(CT ct)
+        => LoadInternalAsync(false, default!, ct);
 
-    async Task<Result<T>> LoadInternalAsync(bool useFallback, T fallbackValue = default!)
+    public Task<Result<T>> LoadAsync(T fallbackValue, CT ct = default)
+        => LoadInternalAsync(true, fallbackValue, ct);
+
+    async Task<Result<T>> LoadInternalAsync(bool useFallback, T fallbackValue, CT ct)
     {
         var result = useFallback
-            ? await storage.TryGetAsync(storageType, storageKey, fallbackValue)
-            : await storage.TryGetAsync<T>(storageType, storageKey);
+            ? await storage.TryGetAsync(storageType, storageKey, fallbackValue, ct)
+            : await storage.TryGetAsync<T>(storageType, storageKey, ct);
         if (!result.Succeeded)
             return Result.Err<T>(result.Errors);
         Value = result.Value;
