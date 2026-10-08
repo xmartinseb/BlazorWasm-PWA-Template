@@ -16,7 +16,7 @@ public sealed class WeatherService(HttpClient httpClient)
     => RunAsync(ct, async ctx =>
     {
         await Task.Delay(800, ct); // Fake delay (GUI test)
-        var forecasts = await HttpClient.GetFromJsonAsync<WeatherForecast[]>("WeatherForecast", ct);
+        var forecasts = await HttpClient.GetFromJsonAsync<WeatherForecast[]>("api/weather-forecast", ct);
         return Result.Ok(forecasts ?? []);
     });
 }

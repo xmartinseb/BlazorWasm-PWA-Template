@@ -4,7 +4,7 @@ using MojePwa.Domain;
 namespace MojePwa.Server.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("api/weather-forecast")]
 public class WeatherForecastController : ControllerBase
 {
     private static readonly string[] Summaries =
@@ -12,8 +12,8 @@ public class WeatherForecastController : ControllerBase
         "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
     ];
 
-    [HttpGet(Name = "GetWeatherForecast")]
-    public IEnumerable<WeatherForecast> Get() 
+    [HttpGet]
+    public IEnumerable<WeatherForecast> GetForecasts() 
     => [.. Enumerable.Range(1, 5).Select(index => new WeatherForecast
         {
             Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),

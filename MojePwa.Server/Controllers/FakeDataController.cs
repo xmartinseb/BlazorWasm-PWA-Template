@@ -4,15 +4,15 @@ using MojePwa.Server.Data;
 namespace MojePwa.Server.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/fake-data")]
 public class FakeDataController(FakeDb fakeDb) : ControllerBase
 {
-    [HttpGet(Name = "GetAllData")]
+    [HttpGet]
     public Dictionary<string, string> GetAll()
         => fakeDb.Data.ToDictionary();
 
-    [HttpPost(Name = "AddFakeData")]
-    public IActionResult AddData([FromBody] KeyValuePair<string, string> data)
+    [HttpPost]
+    public IActionResult SetKey([FromBody] KeyValuePair<string, string> data)
     {
         if (string.IsNullOrEmpty(data.Key)) 
             return BadRequest("Key cannot be null or empty");
