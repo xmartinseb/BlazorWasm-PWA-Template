@@ -9,13 +9,15 @@ public abstract class ServiceBase(HttpClient httpClient)
     const string ConnectionError = "Nepodařilo se spojit se serverem.";
     const string InvalidJsonError = "Server vrátil neplatná data.";
 
-    HttpClient HttpClient { get; } = httpClient;
-
     protected async Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
     {
         try
         {
-            var resultObj = await HttpClient.GetFromJsonAsync<T>(url, ct);
+            using var response = await httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+                return Result.Err<T>(await GetHttpErrorAsync(response, ct));
+
+            var resultObj = await response.Content.ReadFromJsonAsync<T>(ct);
             return resultObj is null
                 ? Result.Err<T>("Server vrátil prázdnou odpověď.")
                 : Result.Ok(resultObj);
@@ -43,11 +45,11 @@ public abstract class ServiceBase(HttpClient httpClient)
     {
         try
         {
-            using var result = await HttpClient.PostAsJsonAsync(url, data, ct);
+            using var result = await httpClient.PostAsJsonAsync(url, data, ct);
             if (result.IsSuccessStatusCode)
                 return Result.Ok();
 
-            return Result.Err(GetHttpError(result.StatusCode));
+            return Result.Err(await GetHttpErrorAsync(result, ct));
         }
         catch (OperationCanceledException)
         {
@@ -74,6 +76,32 @@ public abstract class ServiceBase(HttpClient httpClient)
 
     static string GetHttpError(System.Net.HttpStatusCode statusCode)
         => $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode}).";
+
+    static async Task<string> GetHttpErrorAsync(HttpResponseMessage response, CT ct)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(ct);
+
+            if (problem?.Detail is null)
+                return GenericError;
+
+            return problem.Detail;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return GenericError;
+        }
+    }
+
+    /// <summary>
+    /// Podmnožina properties, které se vyčítají ze standardních chybového formátu RFC 9475
+    /// </summary>
+    sealed record ProblemDetailsResponse(string Detail);
 
     /// <summary>Příkaz vracející <see cref="Result"/>.</summary>
     protected Task<Result> RunAsync(CT ct, Func<ServiceOperationContext, Task<Result>> action)
