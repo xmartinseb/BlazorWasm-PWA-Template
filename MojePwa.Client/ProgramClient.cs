@@ -15,6 +15,7 @@ builder.Services.AddRadzenComponents();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddScoped<IFakeDataService, FakeDataService>();
+builder.Services.AddScoped<ITestApiService, TestApiService>();
 builder.Services.AddScoped<BrowserStorage>();
 builder.Services.AddScoped<BrowserTtlCache>();
 builder.Services.AddScoped<BrowserStoredValueFactory>();

@@ -1,0 +1,32 @@
+﻿@page "/test"
+@implements IDisposable
+@inject ITestApiService TestApiService
+
+<h2>Test API</h2>
+<div>
+    <DataComponent TData="string" ViewModel="DataViewModel" Context="text">
+        <span>@text</span>
+    </DataComponent>
+</div>
+
+@code {
+    TestApiViewModel? DataViewModel { get; set; }
+    readonly CancellationTokenSource _lifetimeCts = new();
+
+    sealed class TestApiViewModel(ITestApiService testApiService) : DataViewModel<string>(
+        dataReloadPeriod: TimeSpan.FromSeconds(3),
+        cacheUsage: null,
+        browserTtlCache: null)
+    {
+        public override async Task<Result<string>> LoadFreshDataAsync(CT ct)
+            => Result.Ok((await testApiService.TestApiGetAsync(ct)).Unwrap());
+    }
+
+    protected override void OnInitialized() => DataViewModel = new(TestApiService);
+
+    public void Dispose()
+    {
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
+    }
+}
