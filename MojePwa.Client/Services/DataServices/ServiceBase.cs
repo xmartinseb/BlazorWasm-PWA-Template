@@ -6,6 +6,8 @@ namespace MojePwa.Client.Services.DataServices;
 public abstract class ServiceBase(HttpClient httpClient)
 {
     const string GenericError = "Operaci se nepodařilo dokončit kvůli neočekávané chybě.";
+    const string ConnectionError = "Nepodařilo se spojit se serverem.";
+    const string InvalidJsonError = "Server vrátil neplatná data.";
 
     HttpClient HttpClient { get; } = httpClient;
 
@@ -14,19 +16,25 @@ public abstract class ServiceBase(HttpClient httpClient)
         try
         {
             var resultObj = await HttpClient.GetFromJsonAsync<T>(url, ct);
-            return Result.Ok(resultObj!);
+            return resultObj is null
+                ? Result.Err<T>("Server vrátil prázdnou odpověď.")
+                : Result.Ok(resultObj);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (HttpRequestException ex)
         {
-            // TODO: je tam standardni popis chyby. Do notifikace title a message
+            return Result.Err<T>(GetHttpError(ex));
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            // TODO: do notifikace chyba jsonu
+            return Result.Err<T>(InvalidJsonError);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-
+            return Result.Err<T>(GenericError);
         }
     }
 
@@ -35,19 +43,37 @@ public abstract class ServiceBase(HttpClient httpClient)
     {
         try
         {
-            var result = await HttpClient.PostAsJsonAsync(url, data, ct);
+            using var result = await HttpClient.PostAsJsonAsync(url, data, ct);
             if (result.IsSuccessStatusCode)
                 return Result.Ok();
+
+            return Result.Err(GetHttpError(result.StatusCode));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (HttpRequestException ex)
         {
-            // TODO: je tam standardni popis chyby. Do notifikace title a message
+            return Result.Err(GetHttpError(ex));
         }
-        catch (Exception ex)
+        catch (JsonException)
         {
-            // TODO: do notifikace obecna chyba
+            return Result.Err("Data se nepodařilo připravit k odeslání.");
+        }
+        catch (Exception)
+        {
+            return Result.Err(GenericError);
         }
     }
+
+    static string GetHttpError(HttpRequestException exception)
+        => exception.StatusCode is { } statusCode
+            ? GetHttpError(statusCode)
+            : ConnectionError;
+
+    static string GetHttpError(System.Net.HttpStatusCode statusCode)
+        => $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode}).";
 
     /// <summary>Příkaz vracející <see cref="Result"/>.</summary>
     protected Task<Result> RunAsync(CT ct, Func<ServiceOperationContext, Task<Result>> action)
