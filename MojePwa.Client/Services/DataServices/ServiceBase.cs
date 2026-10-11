@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Diagnostics;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace MojePwa.Client.Services.DataServices;
@@ -9,6 +10,7 @@ public abstract class ServiceBase(HttpClient httpClient)
     const string ConnectionError = "Nepodařilo se spojit se serverem";
     const string InvalidJsonError = "Chyba formátu JSON";
 
+    // TODO: zpracovani http requestu do samostatneho parametru
     protected Task<Result<string>> GetStringAsync(string url, CT ct)
         => HttpOperationAsync(async () =>
         {
@@ -20,7 +22,7 @@ public abstract class ServiceBase(HttpClient httpClient)
             return resultString is null
                 ? Result.Err<string>("Server vrátil prázdnou textovou odpověď.")
                 : Result.Ok(resultString);
-        });
+        }, Result.Err<string>);
 
     protected Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
         => HttpOperationAsync(async () =>
@@ -33,7 +35,7 @@ public abstract class ServiceBase(HttpClient httpClient)
             return resultObj is null
                 ? Result.Err<T>("Server vrátil prázdnou odpověď.")
                 : Result.Ok(resultObj);
-        });
+        }, Result.Err<T>);
 
     protected Task<Result> PostAsJsonAsync<T>(string url, T data, CT ct)
         => HttpOperationAsync(async () =>
@@ -43,9 +45,10 @@ public abstract class ServiceBase(HttpClient httpClient)
                 return Result.Err(await GetHttpErrorAsync(result, ct));
                 
             return Result.Ok();
-        });
+        }, Result.Err);
 
-    static async Task<TResult> HttpOperationAsync<TResult>(Func<Task<TResult>> action) where TResult : Result, new()
+    static async Task<TResult> HttpOperationAsync<TResult>(
+        Func<Task<TResult>> action, Func<IReadOnlyList<string>, TResult> createError) where TResult : Result
     {
         try
         {
@@ -57,48 +60,30 @@ public abstract class ServiceBase(HttpClient httpClient)
         }
         catch (HttpRequestException ex)
         {
-            return new TResult()
-            {
-                Succeeded = false,
-                Errors = [GetHttpError(ex)]
-            };
+            return createError([GetHttpErrorMessage(ex)]);
         }
         catch (JsonException)
         {
-            return new TResult()
-            {
-                Succeeded = false,
-                Errors = [InvalidJsonError]
-            };
+            return createError([InvalidJsonError]);
         }
         catch (Exception)
         {
-            return new TResult()
-            {
-                Succeeded = false,
-                Errors = [GenericError]
-            };
+            return createError([GenericError]);
         }
     }
 
-    static string GetHttpError(HttpRequestException exception)
+    static string GetHttpErrorMessage(HttpRequestException exception)
         => exception.StatusCode is { } statusCode
-            ? GetHttpError(statusCode)
+            ? $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode})."
             : ConnectionError;
 
-    static string GetHttpError(System.Net.HttpStatusCode statusCode)
-        => $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode}).";
- 
     static async Task<string> GetHttpErrorAsync(HttpResponseMessage response, CT ct)
     {
         try
         {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(ct);
-
-            if (problem?.Detail is null)
-                return GenericError;
-
-            return problem.Detail;
+            return await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(ct) is { Detail: { } problemDetail }
+                ? problemDetail
+                : GenericError;
         }
         catch (OperationCanceledException)
         {
@@ -116,17 +101,15 @@ public abstract class ServiceBase(HttpClient httpClient)
     sealed record ProblemDetailsResponse(string Detail);
 
     /// <summary>Příkaz vracející <see cref="Result"/>.</summary>
-    protected Task<Result> RunAsync(CT ct, Func<ServiceOperationContext, Task<Result>> action)
-        => ExecuteAsync(ct, action, Result.Err);
+    protected static Task<Result> RunAsync(Func<ServiceOperationContext, Task<Result>> action)
+        => ExecuteAsync(action, Result.Err);
 
     /// <summary>Příkaz vracející <see cref="Result{T}"/>.</summary>
-    protected Task<Result<T>> RunAsync<T>(CT ct, Func<ServiceOperationContext, Task<Result<T>>> action)
-        => ExecuteAsync(ct, action, Result.Err<T>);
+    protected static Task<Result<T>> RunAsync<T>(Func<ServiceOperationContext, Task<Result<T>>> action)
+        => ExecuteAsync(action, Result.Err<T>);
 
-    async Task<TResult> ExecuteAsync<TResult>(
-        CT ct,
-        Func<ServiceOperationContext, Task<TResult>> action,
-        Func<IReadOnlyList<string>, TResult> error) where TResult : Result
+    static async Task<TResult> ExecuteAsync<TResult>(
+        Func<ServiceOperationContext, Task<TResult>> action, Func<IReadOnlyList<string>, TResult> error) where TResult : Result
     {
         try
         {
@@ -142,7 +125,7 @@ public abstract class ServiceBase(HttpClient httpClient)
         }
         catch (Exception ex)
         {
-            //logger.LogError(ex, "Neočekávaná chyba");
+            Debug.WriteLine("Unexpected client error: {0}", ex);
             return error([GenericError]);
         }
     }

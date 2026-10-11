@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Výsledek operace v servisní vrstvě. Pro očekávané chyby (porušení byznys pravidel,
-/// validace) se vrací neúspěšný <see cref="Result"/> s chybami – z funkcí by neměly létat výjimky.
+/// validace) se vrací neúspěšný Result s chybami – z client services vrstvy by neměly létat výjimky.
 /// Komponenty tak mohou chyby snadno zobrazit data i případné chyby.
 /// </summary>
 public class Result
@@ -10,14 +10,12 @@ public class Result
     /// <summary>
     /// Slouží pro ošetření chyb v GUI vrstvě bez Exceptions
     /// </summary>
-    public bool Succeeded { get; init; }
+    public bool Succeeded { get; }
 
     /// <summary>
     /// Slouží pro ošetření chyb v GUI vrstvě bez Exceptions
     /// </summary>
-    public IReadOnlyList<string> Errors { get; init; }
-
-    public Result() { Succeeded = false; Errors = []; }
+    public IReadOnlyList<string> Errors { get; }
 
     protected Result(bool succeeded, IReadOnlyList<string> errors)
     {
@@ -30,28 +28,44 @@ public class Result
     public static Result Err(params string[] errors) => new(false, errors);
 
 
-    public static Result<T> Ok<T>(T value) => new(value, true, []);
-    public static Result<T> Err<T>(IReadOnlyList<string> errors) => new(default, false, errors);
-    public static Result<T> Err<T>(params string[] errors) => new(default, false, errors);
+    public static Result<T> Ok<T>(T value) => Result<T>.CreateSuccess(value);
+    public static Result<T> Err<T>(IReadOnlyList<string> errors) => Result<T>.CreateFailure(errors);
+    public static Result<T> Err<T>(params string[] errors) => Result<T>.CreateFailure(errors);
 }
 
 /// <summary>Výsledek operace, která při úspěchu vrací hodnotu.</summary>
 public sealed class Result<T> : Result
 {
-    public T Value { get; init; }
+    readonly T? _value;
 
-    public Result() { Value = default!; }
-
-    public Result(T? value, bool succeeded, IReadOnlyList<string> errors)
-        : base(succeeded, errors)
+    Result(T value) : base(true, [])
     {
-        if (succeeded && value is null)
+        if (value is null)
             throw new InvalidOperationException("Result is successful but value is null.");
-        Value = value!;
+        _value = value;
+    }
+
+    Result(IReadOnlyList<string> errors) : base(false, errors)
+    { }
+
+    internal static Result<T> CreateSuccess(T value) => new(value);
+    internal static Result<T> CreateFailure(IReadOnlyList<string> errors) => new(errors);
+
+    public T Value
+    {
+        get
+        {
+            if (!Succeeded)
+                throw new InvalidOperationException("Cannot access the value of a failed result.");
+
+            return _value is { } value
+                ? value
+                : throw new InvalidOperationException("A successful result must contain a non-null value.");
+        }
     }
 
     /// <summary>
-    /// Používá se POUZE v rámci gui kontextu, kde se automaticky zachycuje UserFriendlyServiceFailException. Slouží ke kratšímu a přehlednějšímu zpracování stavu v GUI.
+    /// Používá se POUZE v rámci kontextu DataComponent, kde se automaticky zachycuje UserFriendlyServiceFailException. Slouží ke kratšímu a přehlednějšímu zpracování stavu v GUI.
     /// </summary>
     /// <exception cref="UserFriendlyServiceFailException"></exception>
     public T Unwrap()
@@ -59,10 +73,7 @@ public sealed class Result<T> : Result
 
     /// <summary>Převede úspěšný výsledek na jiný typ; neúspěch se propaguje beze změny (bez výjimky).</summary>
     public Result<U> MapValue<U>(Func<T, U> conversion)
-        => Succeeded ? new(conversion(Value!), true, Errors) : new(default, false, Errors);
-
-    internal T UnwrapOr(T fallbackValue)
-        => Succeeded ? Value : fallbackValue;
+        => Succeeded ? Result.Ok(conversion(Value)) : Result.Err<U>(Errors);
 }
 
 /// <summary>
