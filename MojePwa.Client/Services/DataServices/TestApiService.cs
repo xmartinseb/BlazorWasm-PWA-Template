@@ -7,7 +7,7 @@ public interface ITestApiService
 public sealed class TestApiService(HttpClient httpClient) : ServiceBase(httpClient), ITestApiService
 {
     public Task<Result<string>> TestApiGetAsync(CT ct)
-        => RunAsync(ct, async ctx =>
+        => RunAsync(async context =>
         {
             return await GetStringAsync("api/test", ct);
         });

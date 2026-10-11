@@ -4,55 +4,82 @@ using System.Text.Json;
 
 namespace MojePwa.Client.Services.DataServices;
 
+/// <summary>
+/// Poskytuje pro servicy HTTP operace s jednotným chováním a zpracováním chyb
+/// </summary>
 public abstract class ServiceBase(HttpClient httpClient)
 {
     const string GenericError = "Operaci se nepodařilo dokončit kvůli neočekávané chybě";
     const string ConnectionError = "Nepodařilo se spojit se serverem";
     const string InvalidJsonError = "Chyba formátu JSON";
 
-    // TODO: zpracovani http requestu do samostatneho parametru
+
+    /// <summary>
+    /// HTTP Get operace; vrácená data se načtou jako obyčejný string
+    /// </summary>
     protected Task<Result<string>> GetStringAsync(string url, CT ct)
-        => HttpOperationAsync(async () =>
-        {
-            using var response = await httpClient.GetAsync(url, ct);
-            if (!response.IsSuccessStatusCode)
-                return Result.Err<string>(await GetHttpErrorAsync(response, ct));
+        => HttpOperationAsync(
+            () => httpClient.GetAsync(url, ct),
+            async response => await response.Content.ReadAsStringAsync(ct) is string responseBodyString
+                ? Result.Ok(responseBodyString)
+                : Result.Err<string>("Server vrátil prázdnou textovou odpověď."),
+            Result.Err<string>, ct);
 
-            string resultString = await response.Content.ReadAsStringAsync(ct);
-            return resultString is null
-                ? Result.Err<string>("Server vrátil prázdnou textovou odpověď.")
-                : Result.Ok(resultString);
-        }, Result.Err<string>);
 
+    /// <summary>
+    /// HTTP Get operace s načtením dat z jsonu
+    /// </summary>
+    /// <typeparam name="T">Typ načítaných dat</typeparam>
     protected Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
-        => HttpOperationAsync(async () =>
-        {
-            using var response = await httpClient.GetAsync(url, ct);
-            if (!response.IsSuccessStatusCode)
-                return Result.Err<T>(await GetHttpErrorAsync(response, ct));
+        => HttpOperationAsync(
+            () => httpClient.GetAsync(url, ct),
+            async response => await response.Content.ReadFromJsonAsync<T>(ct) is { } resultObj
+                    ? Result.Ok(resultObj)
+                    : Result.Err<T>("Server vrátil prázdnou odpověď."), Result.Err<T>, ct);
 
-            var resultObj = await response.Content.ReadFromJsonAsync<T>(ct);
-            return resultObj is null
-                ? Result.Err<T>("Server vrátil prázdnou odpověď.")
-                : Result.Ok(resultObj);
-        }, Result.Err<T>);
-
+    /// <summary>
+    /// HTTP Post operace bez čtení dat z response
+    /// </summary>
+    /// <typeparam name="T">Typ nahrávaných dat</typeparam>
     protected Task<Result> PostAsJsonAsync<T>(string url, T data, CT ct)
-        => HttpOperationAsync(async () =>
-        {
-            using var result = await httpClient.PostAsJsonAsync(url, data, ct);
-            if (!result.IsSuccessStatusCode)
-                return Result.Err(await GetHttpErrorAsync(result, ct));
-                
-            return Result.Ok();
-        }, Result.Err);
+        => HttpOperationAsync(
+            () => httpClient.PostAsJsonAsync(url, data, ct), 
+            async response => Result.Ok(),
+            Result.Err, ct);
 
+    /// <summary>
+    /// HTTP Post operace s načtením dat z response
+    /// </summary>
+    /// <typeparam name="T">Typ nahrávaných dat</typeparam>
+    /// <typeparam name="U">Typ načtených dat z response</typeparam>
+    protected Task<Result<U>> PostAsJsonAsync<T, U>(string url, T data, CT ct)
+        => HttpOperationAsync(
+            () => httpClient.PostAsJsonAsync(url, data, ct),
+            async response => await response.Content.ReadFromJsonAsync<U>(ct) is { } resultObj
+                    ? Result.Ok(resultObj)
+                    : Result.Err<U>("Server vrátil prázdnou odpověď."), Result.Err<U>, ct);
+
+    /// <summary>
+    /// Jednotné zpracování chyb jedním try/catch pro všechny HTTP požadavky.
+    /// </summary>
+    /// <typeparam name="TResult">Typ resultu: buďto Result bez dat, nebo Result s T value</typeparam>
+    /// <param name="sendHttpRequest">Operace odeslání http požadavku. Má jen vrátit response</param>
+    /// <param name="processResponse">Vyčtení dat z response (případně jen vrácení OK)</param>
+    /// <param name="createError">Metoda pro vytvoření error resultu pro případ chyby</param>
+    /// <returns>Result operace daného typu: Result bez dat, nebo Result s T value</returns>
     static async Task<TResult> HttpOperationAsync<TResult>(
-        Func<Task<TResult>> action, Func<IReadOnlyList<string>, TResult> createError) where TResult : Result
+        Func<Task<HttpResponseMessage>> sendHttpRequest,
+        Func<HttpResponseMessage, Task<TResult>> processResponse,
+        Func<IReadOnlyList<string>, TResult> createError,
+        CT ct) where TResult : Result
     {
         try
         {
-            return await action();
+            using var response = await sendHttpRequest();
+            if (!response.IsSuccessStatusCode)
+                return createError([await GetHttpErrorAsync(response, ct)]);
+
+            return await processResponse(response);
         }
         catch (OperationCanceledException)
         {
@@ -77,6 +104,7 @@ public abstract class ServiceBase(HttpClient httpClient)
             ? $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode})."
             : ConnectionError;
 
+
     static async Task<string> GetHttpErrorAsync(HttpResponseMessage response, CT ct)
     {
         try
@@ -100,14 +128,21 @@ public abstract class ServiceBase(HttpClient httpClient)
     /// </summary>
     sealed record ProblemDetailsResponse(string Detail);
 
-    /// <summary>Příkaz vracející <see cref="Result"/>.</summary>
+    /// <summary>
+    /// Obálka pro vykonání kódu v metodě servicy, která dodává jednotný kontext a jednotné zpracování případných exceptions
+    /// </summary>
     protected static Task<Result> RunAsync(Func<ServiceOperationContext, Task<Result>> action)
         => ExecuteAsync(action, Result.Err);
 
-    /// <summary>Příkaz vracející <see cref="Result{T}"/>.</summary>
+    /// <summary>
+    /// Obálka pro vykonání kódu v metodě servicy, která dodává jednotný kontext a jednotné zpracování případných exceptions
+    /// </summary>
     protected static Task<Result<T>> RunAsync<T>(Func<ServiceOperationContext, Task<Result<T>>> action)
         => ExecuteAsync(action, Result.Err<T>);
 
+    /// <summary>
+    /// Jednotný základ pro varianty s Result bez dat a Result s T value
+    /// </summary>
     static async Task<TResult> ExecuteAsync<TResult>(
         Func<ServiceOperationContext, Task<TResult>> action, Func<IReadOnlyList<string>, TResult> error) where TResult : Result
     {
@@ -132,6 +167,7 @@ public abstract class ServiceBase(HttpClient httpClient)
 
     /// <summary>
     /// Místo pro data společná všem service requestům, např. info o přihlášeném uživateli apod.
+    /// Zatím prázdná, patrně bude potřeba později, až se aplikace rozvine.
     /// </summary>
     public readonly record struct ServiceOperationContext();
 }

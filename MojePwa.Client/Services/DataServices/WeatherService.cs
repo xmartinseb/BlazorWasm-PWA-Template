@@ -1,5 +1,4 @@
 ﻿using MojePwa.Domain;
-using System.Net.Http.Json;
 
 namespace MojePwa.Client.Services.DataServices;
 
@@ -13,7 +12,7 @@ public sealed class WeatherService(HttpClient httpClient)
 {
 
     public Task<Result<WeatherForecast[]>> GetForecastAsync(CT ct)
-    => RunAsync(ct, async ctx =>
+    => RunAsync(async context =>
     {
         await Task.Delay(800, ct); // Fake delay (GUI test)
         return await GetFromJsonAsync<WeatherForecast[]>("api/weather-forecast", ct);
