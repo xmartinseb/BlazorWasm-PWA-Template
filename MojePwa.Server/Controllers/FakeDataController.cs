@@ -21,6 +21,7 @@ public sealed class FakeDataController(FakeDbService fakeDbService) : Controller
     public IActionResult SetKey([FromBody] KeyValuePair<string, string> data)
     {
         fakeDbService.Set(data.Key, data.Value);
-        return Ok();
+        return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější varianta
     }
+
 }
