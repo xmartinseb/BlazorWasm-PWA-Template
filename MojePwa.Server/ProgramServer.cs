@@ -21,8 +21,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
-app.UseAuthorization();
 app.UseRouting();
+app.UseAuthorization();
 app.MapControllers();
 app.MapFallbackToFile("index.html");
 app.Run();

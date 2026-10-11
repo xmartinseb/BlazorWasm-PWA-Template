@@ -1,0 +1,15 @@
+Offline fronta neposkytuje zjevnou zpětnou vazbu — service worker zařazuje neúspěšné zápisy do Background Sync, zatímco klientská služba současně může zobrazit požadavek jako neúspěšný. 
+Uživatel tedy nemusí vědět, že se zápis později odešle. 
+Je vhodné jasně rozlišit „uloženo do fronty“ od „selhalo“ a promyslet opakované odeslání i případné duplicity.
+
+
+Projekt Domain zatím obsahuje pouze WeatherForecast, tedy sdílený typ pro API. 
+To je v pořádku pro šablonu, ale při růstu aplikace bych oddělil API kontrakty/DTO od skutečné doménové logiky.
+
+
+ServiceBase převádí i neočekávané výjimky na obecný Result. 
+To je pohodlné pro UI, ale může skrýt programátorské chyby. 
+Zvážil bych rozlišení očekávaných chyb od neočekávaných a doplnění klientského logování.
+
+
+TODO: V index.html vybrat správný způsob registrace service workeru
