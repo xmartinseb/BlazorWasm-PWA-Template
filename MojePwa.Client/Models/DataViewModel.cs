@@ -23,7 +23,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     /// </summary>
     public IGuiState? GuiState
     {
-        get => field;
+        get;
         set
         {
             field = value;
