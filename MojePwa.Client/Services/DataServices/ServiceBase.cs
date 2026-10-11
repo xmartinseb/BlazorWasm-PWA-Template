@@ -5,13 +5,25 @@ namespace MojePwa.Client.Services.DataServices;
 
 public abstract class ServiceBase(HttpClient httpClient)
 {
-    const string GenericError = "Operaci se nepodařilo dokončit kvůli neočekávané chybě.";
-    const string ConnectionError = "Nepodařilo se spojit se serverem.";
-    const string InvalidJsonError = "Server vrátil neplatná data.";
+    const string GenericError = "Operaci se nepodařilo dokončit kvůli neočekávané chybě";
+    const string ConnectionError = "Nepodařilo se spojit se serverem";
+    const string InvalidJsonError = "Chyba formátu JSON";
 
-    protected async Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
-    {
-        try
+    protected Task<Result<string>> GetStringAsync(string url, CT ct)
+        => HttpOperationAsync(async () =>
+        {
+            using var response = await httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode)
+                return Result.Err<string>(await GetHttpErrorAsync(response, ct));
+
+            string resultString = await response.Content.ReadAsStringAsync(ct);
+            return resultString is null
+                ? Result.Err<string>("Server vrátil prázdnou textovou odpověď.")
+                : Result.Ok(resultString);
+        });
+
+    protected Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
+        => HttpOperationAsync(async () =>
         {
             using var response = await httpClient.GetAsync(url, ct);
             if (!response.IsSuccessStatusCode)
@@ -21,35 +33,23 @@ public abstract class ServiceBase(HttpClient httpClient)
             return resultObj is null
                 ? Result.Err<T>("Server vrátil prázdnou odpověď.")
                 : Result.Ok(resultObj);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (HttpRequestException ex)
-        {
-            return Result.Err<T>(GetHttpError(ex));
-        }
-        catch (JsonException)
-        {
-            return Result.Err<T>(InvalidJsonError);
-        }
-        catch (Exception)
-        {
-            return Result.Err<T>(GenericError);
-        }
-    }
+        });
 
+    protected Task<Result> PostAsJsonAsync<T>(string url, T data, CT ct)
+        => HttpOperationAsync(async () =>
+        {
+            using var result = await httpClient.PostAsJsonAsync(url, data, ct);
+            if (!result.IsSuccessStatusCode)
+                return Result.Err(await GetHttpErrorAsync(result, ct));
+                
+            return Result.Ok();
+        });
 
-    protected async Task<Result> PostAsJsonAsync<T>(string url, T data, CT ct)
+    static async Task<TResult> HttpOperationAsync<TResult>(Func<Task<TResult>> action) where TResult : Result, new()
     {
         try
         {
-            using var result = await httpClient.PostAsJsonAsync(url, data, ct);
-            if (result.IsSuccessStatusCode)
-                return Result.Ok();
-
-            return Result.Err(await GetHttpErrorAsync(result, ct));
+            return await action();
         }
         catch (OperationCanceledException)
         {
@@ -57,15 +57,27 @@ public abstract class ServiceBase(HttpClient httpClient)
         }
         catch (HttpRequestException ex)
         {
-            return Result.Err(GetHttpError(ex));
+            return new TResult()
+            {
+                Succeeded = false,
+                Errors = [GetHttpError(ex)]
+            };
         }
         catch (JsonException)
         {
-            return Result.Err("Data se nepodařilo připravit k odeslání.");
+            return new TResult()
+            {
+                Succeeded = false,
+                Errors = [InvalidJsonError]
+            };
         }
         catch (Exception)
         {
-            return Result.Err(GenericError);
+            return new TResult()
+            {
+                Succeeded = false,
+                Errors = [GenericError]
+            };
         }
     }
 
@@ -76,7 +88,7 @@ public abstract class ServiceBase(HttpClient httpClient)
 
     static string GetHttpError(System.Net.HttpStatusCode statusCode)
         => $"Požadavek na serveru selhal (HTTP {(int)statusCode} {statusCode}).";
-
+ 
     static async Task<string> GetHttpErrorAsync(HttpResponseMessage response, CT ct)
     {
         try

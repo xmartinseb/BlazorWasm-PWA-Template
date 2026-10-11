@@ -10,12 +10,14 @@ public class Result
     /// <summary>
     /// Slouží pro ošetření chyb v GUI vrstvě bez Exceptions
     /// </summary>
-    public bool Succeeded { get; }
+    public bool Succeeded { get; init; }
 
     /// <summary>
     /// Slouží pro ošetření chyb v GUI vrstvě bez Exceptions
     /// </summary>
-    public IReadOnlyList<string> Errors { get; }
+    public IReadOnlyList<string> Errors { get; init; }
+
+    public Result() { Succeeded = false; Errors = []; }
 
     protected Result(bool succeeded, IReadOnlyList<string> errors)
     {
@@ -36,7 +38,9 @@ public class Result
 /// <summary>Výsledek operace, která při úspěchu vrací hodnotu.</summary>
 public sealed class Result<T> : Result
 {
-    public T Value { get; }
+    public T Value { get; init; }
+
+    public Result() { Value = default!; }
 
     public Result(T? value, bool succeeded, IReadOnlyList<string> errors)
         : base(succeeded, errors)

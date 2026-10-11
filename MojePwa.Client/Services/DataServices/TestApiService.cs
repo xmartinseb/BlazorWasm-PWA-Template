@@ -1,6 +1,4 @@
-﻿using MojePwa.Domain;
-
-namespace MojePwa.Client.Services.DataServices;
+﻿namespace MojePwa.Client.Services.DataServices;
 
 public interface ITestApiService
 {
@@ -11,6 +9,6 @@ public sealed class TestApiService(HttpClient httpClient) : ServiceBase(httpClie
     public Task<Result<string>> TestApiGetAsync(CT ct)
         => RunAsync(ct, async ctx =>
         {
-            return await GetFromJsonAsync<string>("api/test", ct);
+            return await GetStringAsync("api/test", ct);
         });
 }
