@@ -10,18 +10,25 @@ namespace MojePwa.Server.Controllers;
 public sealed class FakeDataController(FakeDbService fakeDbService) : ControllerBase
 {
     [HttpGet]
+    [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public Dictionary<string, string> GetAll()
         => fakeDbService.GetAll();
 
     [HttpGet("{key}")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public string GetValue(string key)
         => fakeDbService.Get(key);
 
     [HttpPost]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult SetKey([FromBody] KeyValuePair<string, string> data)
     {
         fakeDbService.Set(data.Key, data.Value);
         return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější varianta
     }
-
 }
