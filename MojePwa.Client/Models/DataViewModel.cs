@@ -4,13 +4,23 @@ using MojePwa.Client.Services.DataServices;
 namespace MojePwa.Client.Models;
 
 /// <summary>
-/// View model s logikou pro DataComponent
+/// View model s logikou pro DataComponent. Obsahuje stav GUI, přechod mezi stavy, načítací metody apod.
 /// </summary>
 public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, BrowserCacheUsage? cacheUsage, BrowserTtlCache? browserTtlCache)
 {
+    /// <summary>
+    /// Tuto eventu zachytává datová komponenta, na základě ní volá ve správné časy StateHasChanged
+    /// </summary>
     public event EventHandler? BlazorStateHasChanged;
+
+    /// <summary>
+    /// Zabraňuje vícenásobnému načítání dat najednou
+    /// </summary>
     CancellationTokenSource? _loopCts;
 
+    /// <summary>
+    /// Stav GUI: Loading, Loaded (with data), Error
+    /// </summary>
     public IGuiState? GuiState
     {
         get => field;
@@ -21,12 +31,20 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
         }
     }
 
+    /// <summary>
+    /// Zavolat ve chvíli, kdy je potřeba překreslit datovou komponentu
+    /// </summary>
     protected void RaiseBlazorStateHasChanged() => BlazorStateHasChanged?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>
+    /// Jak často se mají reloadnout data ze serveru pro datovou komponentu
+    /// </summary>
     public TimeSpan? DataReloadPeriod { get; init; } = dataReloadPeriod;
 
     /// <summary>
     /// Je-li NULL, cache prohlížeče se nepoužije. Má-li hodnotu, definuje způsob cachování.
+    /// Browser cache je dvojího typu: session storage a local storage.
+    /// Správné využití šetří requesty na server a recykluje data načtená nedávno apod.
     /// </summary>
     public BrowserCacheUsage? CacheUsage { get; init; } = cacheUsage;
 
@@ -35,6 +53,9 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     /// </summary>
     public abstract Task<Result<TDataLoaded>> LoadFreshDataAsync(CT ct);
 
+    /// <summary>
+    /// Zavolá se po kliknutí na tlačítko Retry, které se umí zobrazit v GUI stavu Error
+    /// </summary>
     public Task OnRetryClickAsync(CT ct) => LoadAndSetGuiStateAsync("loading...", ct);
 
     /// <summary>
@@ -87,11 +108,17 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
         }
     }
 
+    /// <returns>
+    /// Pokud jsme ve stavu Loaded, vrátí načtená data, jinak NULL
+    /// </returns>
     public TDataLoaded? TryGetLoadedData() 
         => GuiState is StateLoaded<DataWithTimestamp<TDataLoaded>> loaded 
             ? loaded.LoadedData.Data 
             : default;
 
+    /// <summary>
+    /// Rozhodovací procedura: načte se z cache, pokud je to povoleno a jsou tam platná data. Jinak načte ze serveru.
+    /// </summary>
     async Task<Result<DataWithTimestamp<TDataLoaded>>> LoadFromCacheOrLoadFresh(CT ct)
     {
         if (CacheUsage is { } c && browserTtlCache is not null)
@@ -137,6 +164,9 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 
+    /// <summary>
+    /// Vypočítává delay časy pro periodické reloadování dat
+    /// </summary>
     TimeSpan GetNextDelay()
     {
         var delay = DataReloadPeriod!.Value;

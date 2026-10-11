@@ -1,6 +1,24 @@
+
+
+==============================================================================================================================
 Offline fronta neposkytuje zjevnou zpětnou vazbu — service worker zařazuje neúspěšné zápisy do Background Sync, zatímco klientská služba současně může zobrazit požadavek jako neúspěšný. 
 Uživatel tedy nemusí vědět, že se zápis později odešle. 
 Je vhodné jasně rozlišit „uloženo do fronty“ od „selhalo“ a promyslet opakované odeslání i případné duplicity.
+
+V aktuálním řešení je problém v tom, že Workbox požadavek při výpadku sítě zařadí do fronty, ale původní fetch přesto skončí chybou. Klientská ServiceBase v MojePwa.Client/Services/DataServices/ServiceBase.cs pak dostane HttpRequestException a neumí poznat, že požadavek čeká na pozdější odeslání.
+Rychlejší varianta: signalizovat „zařazeno“
+V service-worker.published.js místo pouhého BackgroundSyncPlugin použít obsluhu, která:
+1.	při síťovém selhání požadavek skutečně uloží do Workbox fronty;
+2.	pokud se uložení povede, vrátí klientovi syntetickou odpověď, např. HTTP 202 a hlavičku X-Offline-Queued: true;
+3.	pokud selže i uložení do fronty, nechá požadavek skončit chybou.
+Klient pak v ServiceBase rozliší tři stavy, například Succeeded, Queued a Failed. UI zobrazí „Požadavek čeká na připojení“ místo obecné chyby. Samotné 202 bych nepoužíval jako jediný rozlišovací znak, protože ho může legitimně vracet i server.
+Tím ale UI ví jen to, že požadavek čeká ve frontě, ne zda pozdější odeslání uspělo.
+Robustnější varianta: aplikační outbox
+Pokud je důležité ukázat i konečný výsledek, udělal bych z fronty explicitní součást aplikace: klient uloží operaci do IndexedDB se stavem Pending, po připojení ji odešle a aktualizuje na Succeeded nebo Failed. UI pak může zobrazovat čekající operace a případně nabídnout opakování.
+U obou variant je dobré počítat s tím, že Background Sync není zaručeně dostupný ve všech prohlížečích. Pro zápisy také používejte idempotentní operace nebo identifikátor požadavku, aby opakované odeslání nevytvořilo duplicity.
+Pro tuto šablonu bych začal první variantou a jasným stavem Queued. Pokud budou zápisy kritické nebo bude potřeba hlásit jejich konečný výsledek, přešel bych na aplikační outbox.
+
+==============================================================================================================================
 
 
 Projekt Domain zatím obsahuje pouze WeatherForecast, tedy sdílený typ pro API. 
