@@ -133,7 +133,10 @@ public abstract class ServiceBase(HttpClient httpClient)
     /// <summary>
     /// Podmnožina properties, které se vyčítají ze standardních chybového formátu RFC 9475
     /// </summary>
-    sealed record ProblemDetailsResponse(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
+    /// <param name="Title">Nadpis chyby, součást JSON formátu RFC 9475</param>
+    /// <param name="Detail">Popis chyby, součást JSON formátu RFC 9475</param>
+    /// <param name="Errors">Chyby validace akcí</param>
+    sealed record ProblemDetailsResponse(string? Title, string? Detail, Dictionary<string, string[]>? Errors); // TODO: Vyzkoušet Errors
 
     /// <summary>
     /// Obálka pro vykonání kódu v metodě servicy, která dodává jednotný kontext a jednotné zpracování případných exceptions
