@@ -22,7 +22,7 @@ public sealed class FakeDataController(FakeDbService fakeDbService) : Controller
     public string GetValue(string key)
         => fakeDbService.Get(key);
 
-    [HttpPost]
+    [HttpPut]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]

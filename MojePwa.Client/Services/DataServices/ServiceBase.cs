@@ -49,6 +49,16 @@ public abstract class ServiceBase(HttpClient httpClient)
             Result.Err, ct);
 
     /// <summary>
+    /// HTTP Post operace bez čtení dat z response
+    /// </summary>
+    /// <typeparam name="TUpload">Typ nahrávaných dat</typeparam>
+    protected Task<Result> PutAsJsonAsync<TUpload>(string url, TUpload data, CT ct)
+        => HttpOperationAsync(
+            () => httpClient.PutAsJsonAsync(url, data, ct),
+            async response => Result.Ok(),
+            Result.Err, ct);
+
+    /// <summary>
     /// HTTP Post operace s načtením dat z response
     /// </summary>
     /// <typeparam name="TUpload">Typ nahrávaných dat</typeparam>
