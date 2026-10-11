@@ -15,7 +15,8 @@ public abstract class ServiceBase(HttpClient httpClient)
 
 
     /// <summary>
-    /// HTTP Get operace; vrácená data se načtou jako obyčejný string
+    /// HTTP Get operace; vrácená data se načtou jako obyčejný string.
+    /// Obyčejný string se nedá parsovat jako JSON objekt!
     /// </summary>
     protected Task<Result<string>> GetStringAsync(string url, CT ct)
         => HttpOperationAsync(
@@ -29,19 +30,19 @@ public abstract class ServiceBase(HttpClient httpClient)
     /// <summary>
     /// HTTP Get operace s načtením dat z jsonu
     /// </summary>
-    /// <typeparam name="T">Typ načítaných dat</typeparam>
-    protected Task<Result<T>> GetFromJsonAsync<T>(string url, CT ct)
+    /// <typeparam name="TResponse">Typ načítaných dat</typeparam>
+    protected Task<Result<TResponse>> GetFromJsonAsync<TResponse>(string url, CT ct)
         => HttpOperationAsync(
             () => httpClient.GetAsync(url, ct),
-            async response => await response.Content.ReadFromJsonAsync<T>(ct) is { } resultObj
+            async response => await response.Content.ReadFromJsonAsync<TResponse>(ct) is { } resultObj
                     ? Result.Ok(resultObj)
-                    : Result.Err<T>("Server vrátil prázdnou odpověď."), Result.Err<T>, ct);
+                    : Result.Err<TResponse>("Server vrátil prázdnou odpověď."), Result.Err<TResponse>, ct);
 
     /// <summary>
     /// HTTP Post operace bez čtení dat z response
     /// </summary>
-    /// <typeparam name="T">Typ nahrávaných dat</typeparam>
-    protected Task<Result> PostAsJsonAsync<T>(string url, T data, CT ct)
+    /// <typeparam name="TUpload">Typ nahrávaných dat</typeparam>
+    protected Task<Result> PostAsJsonAsync<TUpload>(string url, TUpload data, CT ct)
         => HttpOperationAsync(
             () => httpClient.PostAsJsonAsync(url, data, ct), 
             async response => Result.Ok(),
@@ -50,28 +51,28 @@ public abstract class ServiceBase(HttpClient httpClient)
     /// <summary>
     /// HTTP Post operace s načtením dat z response
     /// </summary>
-    /// <typeparam name="T">Typ nahrávaných dat</typeparam>
-    /// <typeparam name="U">Typ načtených dat z response</typeparam>
-    protected Task<Result<U>> PostAsJsonAsync<T, U>(string url, T data, CT ct)
+    /// <typeparam name="TUpload">Typ nahrávaných dat</typeparam>
+    /// <typeparam name="TResponse">Typ načtených dat z response</typeparam>
+    protected Task<Result<TResponse>> PostAsJsonAsync<TUpload, TResponse>(string url, TUpload data, CT ct)
         => HttpOperationAsync(
             () => httpClient.PostAsJsonAsync(url, data, ct),
-            async response => await response.Content.ReadFromJsonAsync<U>(ct) is { } resultObj
+            async response => await response.Content.ReadFromJsonAsync<TResponse>(ct) is { } resultObj
                     ? Result.Ok(resultObj)
-                    : Result.Err<U>("Server vrátil prázdnou odpověď."), Result.Err<U>, ct);
+                    : Result.Err<TResponse>("Server vrátil prázdnou odpověď."), Result.Err<TResponse>, ct);
 
     /// <summary>
     /// Jednotné zpracování chyb jedním try/catch pro všechny HTTP požadavky.
     /// </summary>
-    /// <typeparam name="TResult">Typ resultu: buďto Result bez dat, nebo Result s T value</typeparam>
+    /// <typeparam name="THttpResult">Typ resultu: buďto Result bez dat, nebo Result s T value</typeparam>
     /// <param name="sendHttpRequest">Operace odeslání http požadavku. Má jen vrátit response</param>
     /// <param name="processResponse">Vyčtení dat z response (případně jen vrácení OK)</param>
     /// <param name="createError">Metoda pro vytvoření error resultu pro případ chyby</param>
     /// <returns>Result operace daného typu: Result bez dat, nebo Result s T value</returns>
-    static async Task<TResult> HttpOperationAsync<TResult>(
+    static async Task<THttpResult> HttpOperationAsync<THttpResult>(
         Func<Task<HttpResponseMessage>> sendHttpRequest,
-        Func<HttpResponseMessage, Task<TResult>> processResponse,
-        Func<IReadOnlyList<string>, TResult> createError,
-        CT ct) where TResult : Result
+        Func<HttpResponseMessage, Task<THttpResult>> processResponse,
+        Func<IReadOnlyList<string>, THttpResult> createError,
+        CT ct) where THttpResult : Result
     {
         try
         {
