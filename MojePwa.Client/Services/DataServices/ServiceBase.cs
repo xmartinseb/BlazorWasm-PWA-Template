@@ -81,9 +81,13 @@ public abstract class ServiceBase(HttpClient httpClient)
 
             return await processResponse(response);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // skutečné zrušení requestu
+        }
         catch (OperationCanceledException)
         {
-            throw;
+            return createError(["Server neodpověděl včas"]); // timeout, neni to zrušení
         }
         catch (HttpRequestException ex)
         {
@@ -109,9 +113,12 @@ public abstract class ServiceBase(HttpClient httpClient)
     {
         try
         {
-            return await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(ct) is { Detail: { } problemDetail }
-                ? problemDetail
-                : GenericError;
+            var problemDetails = await response.Content.ReadFromJsonAsync<ProblemDetailsResponse>(ct);
+
+            return problemDetails?.Detail
+                ?? problemDetails?.Errors?.Values.SelectMany(v => v).FirstOrDefault()
+                ?? problemDetails?.Title
+                ?? GenericError;
         }
         catch (OperationCanceledException)
         {
@@ -119,14 +126,14 @@ public abstract class ServiceBase(HttpClient httpClient)
         }
         catch (Exception)
         {
-            return GenericError;
+            return "Chyba zpracování chyb na straně klienta";
         }
     }
 
     /// <summary>
     /// Podmnožina properties, které se vyčítají ze standardních chybového formátu RFC 9475
     /// </summary>
-    sealed record ProblemDetailsResponse(string Detail);
+    sealed record ProblemDetailsResponse(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
 
     /// <summary>
     /// Obálka pro vykonání kódu v metodě servicy, která dodává jednotný kontext a jednotné zpracování případných exceptions
