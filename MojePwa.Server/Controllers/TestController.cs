@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MojePwa.Server.Data;
 using MojePwa.Server.Services.Exceptions;
 
 namespace MojePwa.Server.Controllers;

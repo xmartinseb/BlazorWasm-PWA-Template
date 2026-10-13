@@ -54,6 +54,12 @@ public class UserFriendlyUnauthorizedException(string messageForUser, Exception?
     public override string Title => "Unauthrorized";
 }
 
+public class UserFriendlyInvalidRequestException(string messageForUser, Exception? inner = null) : UserFriendlyException(messageForUser, inner)
+{
+    public override int HttpStatus => 400;
+    public override string Title => "Invalid request";
+}
+
 /// <summary>
 /// Tyto výjimky se vyznačují tím, že obsahují zprávy, které se dají vracet z API ven.
 /// Dojde-li k jejich vyhození v service či controlleru, middleware ApiExceptionHandler je automaticky zachytí.

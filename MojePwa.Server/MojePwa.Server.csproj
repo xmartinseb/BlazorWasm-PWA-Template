@@ -16,4 +16,8 @@
     <ProjectReference Include="..\MojePwa.Domain\MojePwa.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Data\" />
+  </ItemGroup>
+
 </Project>

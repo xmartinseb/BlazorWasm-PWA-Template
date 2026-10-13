@@ -1,7 +1,7 @@
 global using CT = System.Threading.CancellationToken;
-using MojePwa.Server.Data;
-using MojePwa.Server.Services.Exceptions;
 using Microsoft.OpenApi;
+using MojePwa.Server.Services;
+using MojePwa.Server.Services.Exceptions;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();

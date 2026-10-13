@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MojePwa.Server.Data;
+using MojePwa.Server.Services;
+using MojePwa.Server.Services.Exceptions;
 
 namespace MojePwa.Server.Controllers;
 
@@ -22,13 +23,22 @@ public sealed class FakeDataController(FakeDbService fakeDbService) : Controller
     public string GetValue(string key)
         => fakeDbService.Get(key);
 
+    /// <summary>
+    /// Idempotentní operace by měly být metoda PUT
+    /// </summary>
     [HttpPut]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult SetKey([FromBody] KeyValuePair<string, string> data)
     {
+        // Na úrovni controlleru chceme informovat konzumenta API, který http parametr je špatně
+        //
+        // Na úrovni servicy samozřejmě validujeme argumenty taky, ale už ne pomocí user friendly výjimky,
+        // protože to už nejsou uživatelovy http argumenty, ale argumenty normálních C# metod
+        UserFriendlyArgumentNullException.ThrowIfNull(data.Key);
+
         fakeDbService.Set(data.Key, data.Value);
-        return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější varianta
+        return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější success varianta
     }
 }
