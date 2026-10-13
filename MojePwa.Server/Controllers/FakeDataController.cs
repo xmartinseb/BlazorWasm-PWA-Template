@@ -32,7 +32,7 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult SetKey([FromBody] SetFakeDbKeyRequestDto r)
     {
-        fakeDbService.Set(r);
+        fakeDbService.Set(r.Key, r.Value);
         return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější success varianta
     }
 
@@ -44,5 +44,5 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public bool TryAddKey([FromBody] SetFakeDbKeyRequestDto r) 
-        => fakeDbService.TryAdd(r);
+        => fakeDbService.TryAdd(r.Key, r.Value);
 }
