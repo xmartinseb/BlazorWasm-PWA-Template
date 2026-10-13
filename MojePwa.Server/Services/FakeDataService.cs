@@ -28,6 +28,12 @@ public sealed class FakeDataService
         return data.TryAdd(key, value);
     }
 
+    internal bool TryRemove(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return data.TryRemove(key, out _);
+    }
+
     // Exception se týká přímo operace konzumenta api, proto je user friendly. Tyto informace by konzument vidět měl
     internal string Get(string key)
         => data.TryGetValue(key, out string? value)

@@ -14,7 +14,6 @@ public class WeatherForecastController : ControllerBase
 
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<WeatherForecast>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IEnumerable<WeatherForecast> GetForecasts() 
     => [.. Enumerable.Range(1, 5).Select(index => new WeatherForecast
         {

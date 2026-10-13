@@ -12,16 +12,22 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
 {
     [HttpGet]
     [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public Dictionary<string, string> GetAll()
         => fakeDbService.GetAll();
 
     [HttpGet("{key}")]
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public ActionResult<string> GetValue(string key)
         => fakeDbService.Get(key);
+
+    [HttpDelete("{key}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public IActionResult DeleteKey(string key)
+        => fakeDbService.TryRemove(key)
+            ? NoContent()
+            : NotFound();
 
     /// <summary>
     /// Idempotentní operace by měly být metoda PUT
@@ -29,7 +35,6 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [HttpPut]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult SetKey([FromBody] SetFakeDbKeyRequestDto r)
     {
         fakeDbService.Set(r.Key, r.Value);
@@ -45,7 +50,6 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult TryAddKey([FromBody] SetFakeDbKeyRequestDto r)
         => fakeDbService.TryAdd(r.Key, r.Value)
             ? Created()
