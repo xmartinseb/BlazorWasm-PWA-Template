@@ -6,7 +6,7 @@ namespace MojePwa.Server.Services;
 /// <summary>
 /// Only for demonstration purposes, not used in production. It is a placeholder for a database context or similar data access layer.
 /// </summary>
-public sealed class FakeDbService
+public sealed class FakeDataService
 {
     readonly ConcurrentDictionary<string, string> data = [];
 

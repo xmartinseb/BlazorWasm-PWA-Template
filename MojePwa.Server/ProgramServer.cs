@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen(options =>
         Title = "MojePwa API",
         Version = "v1"
     }));
-builder.Services.AddSingleton<FakeDbService>();
+builder.Services.AddSingleton<FakeDataService>();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 

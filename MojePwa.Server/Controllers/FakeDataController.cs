@@ -8,7 +8,7 @@ namespace MojePwa.Server.Controllers;
 
 [ApiController]
 [Route("api/fake-data")]
-public sealed class FakeDataController(FakeDbService fakeDbService) : ControllerBase
+public sealed class FakeDataController(FakeDataService fakeDbService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(Dictionary<string, string>), StatusCodes.Status200OK)]
