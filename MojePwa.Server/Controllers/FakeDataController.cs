@@ -20,15 +20,15 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public string GetValue(string key)
+    public ActionResult<string> GetValue(string key)
         => fakeDbService.Get(key);
 
     /// <summary>
     /// Idempotentní operace by měly být metoda PUT
     /// </summary>
-    [HttpPut("set-key")]
+    [HttpPut]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public IActionResult SetKey([FromBody] SetFakeDbKeyRequestDto r)
     {
@@ -37,12 +37,17 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     }
 
     /// <summary>
-    /// Idempotentní operace by měly být metoda PUT
+    /// Operace “vytvoř, pokud neexistuje” a vrať bool není čistý idempotentní PUT. Proto je to POST.
+    /// Vrací se: 201 Created nebo 409 Conflict. 
+    /// Aby to byl čistý PUT, přidal bych header If-None-Match: *, kdy server odpoví 412 Precondition Failed, pokud klíč existuje.
     /// </summary>
-    [HttpPut("try-add-key")]
-    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [HttpPost("try-add-key")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public bool TryAddKey([FromBody] SetFakeDbKeyRequestDto r) 
-        => fakeDbService.TryAdd(r.Key, r.Value);
+    public IActionResult TryAddKey([FromBody] SetFakeDbKeyRequestDto r)
+        => fakeDbService.TryAdd(r.Key, r.Value)
+            ? Created()
+            : Conflict();
 }

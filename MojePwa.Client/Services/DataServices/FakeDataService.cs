@@ -15,7 +15,7 @@ public sealed class FakeDataService(HttpClient httpClient)
     => RunAsync(async context =>
     {
         await Task.Delay(1500, ct); // Fake delay (GUI test)
-        return await PutAsJsonAsync("api/fake-data/set-key", r, ct);
+        return await PutAsJsonAsync("api/fake-data", r, ct);
     });
 
     public Task<Result<Dictionary<string, string>>> GetAllDataAsync(CT ct)
