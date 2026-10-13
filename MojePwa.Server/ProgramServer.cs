@@ -17,6 +17,8 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
 var app = builder.Build();
+app.UseExceptionHandler();
+//app.UseStatusCodePages(); // Note: AI doporučuje, zatim neni potřeba
 app.UseBlazorFrameworkFiles();
 app.UseStaticFiles();
 
@@ -26,10 +28,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
 app.MapControllers();
+app.MapFallback("/api/{**path}", () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found", detail: "No API endpoint matches the requested path"));
 app.MapFallbackToFile("index.html");
 app.Run();

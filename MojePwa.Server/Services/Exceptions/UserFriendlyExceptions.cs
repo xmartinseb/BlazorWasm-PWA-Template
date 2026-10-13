@@ -1,4 +1,34 @@
-﻿namespace MojePwa.Server.Services.Exceptions;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
+namespace MojePwa.Server.Services.Exceptions;
+
+/// <summary>
+/// Vyhazuje na NULL nějakého parametru, který je nastavován konzumentem API. Proto je jistota, že je obsažená zpráva
+/// o chybném argumentu publikovatelná (na rozdíl od System.ArgumentNullException, které se může vyhodit odkudkoliv a obsahovat tak citlivé informace o kódu)
+/// </summary>
+public class UserFriendlyArgumentNullException(string paramName, string? messageForUser = null) 
+    : UserFriendlyArgumentException(paramName, messageForUser ?? $"Argument {paramName} cannot be NULL")
+{
+    public override string Title => "Argument NULL error";
+
+    public static void ThrowIfNull([NotNull] object? argument, [CallerArgumentExpression(nameof(argument))] string? paramName = null)
+    {
+        if (argument is null) throw new UserFriendlyArgumentNullException(paramName ?? "");
+    }
+}
+
+
+/// <summary>
+/// Vyhazuje se, když dojde k nějaké chybě u parametru, který je nastavován konzumentem API. Proto je jistota, že je obsažená zpráva
+/// o chybném argumentu publikovatelná (na rozdíl od System.ArgumentException, které se může vyhodit odkudkoliv a obsahovat tak citlivé informace o kódu)
+/// </summary>
+public class UserFriendlyArgumentException(string paramName, string messageForUser) : UserFriendlyException(messageForUser, null)
+{
+    public override int HttpStatus => 400;
+    public override string Title => "Argument error";
+    public string ParamName { get; } = paramName;
+}
 
 public class UserFriendlyNotFoundException(string messageForUser, Exception? inner = null) : UserFriendlyException(messageForUser, inner)
 {
@@ -18,7 +48,7 @@ public class UserFriendlyForbiddenException(string messageForUser, Exception? in
 /// <summary>
 /// Uživatel neni přihlášen
 /// </summary>
-public class UserFriendlyUnauthrorizedException(string messageForUser, Exception? inner = null) : UserFriendlyException(messageForUser, inner)
+public class UserFriendlyUnauthorizedException(string messageForUser, Exception? inner = null) : UserFriendlyException(messageForUser, inner)
 {
     public override int HttpStatus => 401;
     public override string Title => "Unauthrorized";
@@ -28,7 +58,7 @@ public class UserFriendlyUnauthrorizedException(string messageForUser, Exception
 /// Tyto výjimky se vyznačují tím, že obsahují zprávy, které se dají vracet z API ven.
 /// Dojde-li k jejich vyhození v service či controlleru, middleware ApiExceptionHandler je automaticky zachytí.
 /// </summary>
-/// <param name="messageForUser">Bezpečná zpráva, která se dá vrátit ven z API a neobsahuje žádné citlivé údaje</param>
+/// <param name="messageForUser">Uživatelsky čitelná bezpečná zpráva, která neobsahuje žádné citlivé údaje z kódu</param>
 /// <param name="inner">Původní chyba, která se nikam nevystavuje, jen se zaloguje</param>
 public abstract class UserFriendlyException(string messageForUser, Exception? inner) : Exception(messageForUser, inner)
 {

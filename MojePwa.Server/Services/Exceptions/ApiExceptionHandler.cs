@@ -18,11 +18,11 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
         var (status, title, detail) = ex switch
         {
             UserFriendlyException uex => (uex.HttpStatus, uex.Title, uex.Message),
-            ArgumentNullException anex => (StatusCodes.Status400BadRequest, "Argument cannot be NULL", $"Argument {anex.ParamName} cannot be NULL"),
-            ArgumentOutOfRangeException arex => (StatusCodes.Status400BadRequest, "Argument out of range", $"Argument out of range: {arex.ParamName}"),
-            ArgumentException aex => (StatusCodes.Status400BadRequest, "Invalid argument", $"Invalid argument: {aex.ParamName}"),
+            ArgumentNullException => (StatusCodes.Status400BadRequest, "Bad Request", "A required argument is missing"),
+            ArgumentOutOfRangeException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is outside the permitted range"),
+            ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is invalid"),
             UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden", "You are not allowed to perform this operation"),
-            InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict", ex.Message),
+            InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict", "The request could not be completed in the current state"),
             _ => (StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred")
         };
 

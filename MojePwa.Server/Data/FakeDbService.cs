@@ -14,7 +14,7 @@ public sealed class FakeDbService
 
     internal void Set(string key, string value)
     {
-        ArgumentNullException.ThrowIfNull(key);
+        UserFriendlyArgumentNullException.ThrowIfNull(key);
         data[key] = value;
     }
 

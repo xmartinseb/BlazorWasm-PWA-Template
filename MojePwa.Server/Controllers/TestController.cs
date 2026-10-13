@@ -21,7 +21,7 @@ public sealed class TestController: ControllerBase
             0 => "API text response",
             2 => throw new UserFriendlyForbiddenException("TEST forbidden message"),
             3 => throw new UserFriendlyNotFoundException("TEST not found"),
-            4 => throw new UserFriendlyUnauthrorizedException("TEST unauthorized message"),
+            4 => throw new UserFriendlyUnauthorizedException("TEST unauthorized message"),
             _ => throw new ArgumentException("TEST argument message", "TestParameterName"),
         };
 }
