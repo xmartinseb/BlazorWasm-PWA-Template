@@ -46,7 +46,7 @@ public sealed class FakeDataController(FakeDbService fakeDbService) : Controller
     /// Idempotentní operace by měly být metoda PUT
     /// </summary>
     [HttpPut("try-add-key")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public bool TryAddKey([FromBody] KeyValuePair<string, string> data)
