@@ -1,4 +1,5 @@
-﻿using MojePwa.Server.Services.Exceptions;
+﻿using MojePwa.Domain.Dto;
+using MojePwa.Server.Services.Exceptions;
 using System.Collections.Concurrent;
 
 namespace MojePwa.Server.Services;
@@ -12,20 +13,20 @@ public sealed class FakeDataService
 
     public Dictionary<string, string> GetAll() => data.ToDictionary();
 
-    internal void Set(string key, string value)
+    internal void Set(SetFakeDbKeyRequestDto r)
     {
         // Na úrovni servis už by něměly být požity argumentové user-friendly výjimky, protože toto už nejsou http parametry,
         // ale parametry normálních C# metod
-        ArgumentNullException.ThrowIfNull(key);
-        data[key] = value;
+        ArgumentNullException.ThrowIfNull(r.Key);
+        data[r.Key] = r.Value;
     }
 
-    internal bool TryAdd(string key, string value)
+    internal bool TryAdd(SetFakeDbKeyRequestDto r)
     {
         // Na úrovni servis už by něměly být požity argumentové user-friendly výjimky, protože toto už nejsou http parametry,
         // ale parametry normálních C# metod
-        ArgumentNullException.ThrowIfNull(key);
-        return data.TryAdd(key, value);
+        ArgumentNullException.ThrowIfNull(r.Key);
+        return data.TryAdd(r.Key, r.Value);
     }
 
     // Exception se týká přímo operace konzumenta api, proto je user friendly. Tyto informace by konzument vidět měl

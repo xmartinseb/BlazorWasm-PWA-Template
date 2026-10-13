@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MojePwa.Domain.Dto;
 using MojePwa.Server.Services;
-using MojePwa.Server.Services.Exceptions;
 
 namespace MojePwa.Server.Controllers;
 
@@ -30,15 +30,9 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public IActionResult SetKey([FromBody] KeyValuePair<string, string> data)
+    public IActionResult SetKey([FromBody] SetFakeDbKeyRequestDto r)
     {
-        // Na úrovni controlleru chceme informovat konzumenta API, který http parametr je špatně
-        //
-        // Na úrovni servicy samozřejmě validujeme argumenty taky, ale už ne pomocí user friendly výjimky,
-        // protože to už nejsou uživatelovy http argumenty, ale argumenty normálních C# metod
-        UserFriendlyArgumentNullException.ThrowIfNull(data.Key);
-
-        fakeDbService.Set(data.Key, data.Value);
+        fakeDbService.Set(r);
         return NoContent(); // Note: pro akce, které nevrací data, je toto nejpřesnější success varianta
     }
 
@@ -49,13 +43,6 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
-    public bool TryAddKey([FromBody] KeyValuePair<string, string> data)
-    {
-        // Na úrovni controlleru chceme informovat konzumenta API, který http parametr je špatně
-        //
-        // Na úrovni servicy samozřejmě validujeme argumenty taky, ale už ne pomocí user friendly výjimky,
-        // protože to už nejsou uživatelovy http argumenty, ale argumenty normálních C# metod
-        UserFriendlyArgumentNullException.ThrowIfNull(data.Key);
-        return fakeDbService.TryAdd(data.Key, data.Value);
-    }
+    public bool TryAddKey([FromBody] SetFakeDbKeyRequestDto r) 
+        => fakeDbService.TryAdd(r);
 }

@@ -45,7 +45,7 @@
         busy = true;
         try
         {
-            var result = await FakeDataService.AddFakeDataAsync(NewFakeDataVm.Key, NewFakeDataVm.Value, _cts.Token);
+            var result = await FakeDataService.AddFakeDataAsync(new SetFakeDbKeyRequestDto(NewFakeDataVm.Key, NewFakeDataVm.Value), _cts.Token);
 
             if (result.Succeeded)
             {
