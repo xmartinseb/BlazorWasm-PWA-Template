@@ -4,12 +4,16 @@ using MojePwa.Client.Services.DataServices;
 namespace MojePwa.Client.Models;
 
 /// <summary>
-/// View model s logikou pro DataComponent. Obsahuje stav GUI, přechod mezi stavy, načítací metody apod.
+/// View model pro DataComponent, skrze který se datová komponenta ovládá.
+/// Podporuje různé režimy načítání a cachování dat.
 /// </summary>
+/// <param name="dataReloadPeriod">Perioda stahování čerstvých dat ze serveru pomocí timeru. Je-li NULL, reload neprobíhá</param>
+/// <param name="cacheUsage">Způsob využití cache v browseru, což může ušetřit přenosy dat. Je-li NULL, nepoužívá se cache</param>
+/// <param name="browserTtlCache">Přístup k cache browseru. Pokud je cache usage NOT NULL, toto je taky NOT NULL</param>
 public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, BrowserCacheUsage? cacheUsage, BrowserTtlCache? browserTtlCache)
 {
     /// <summary>
-    /// Tuto eventu zachytává datová komponenta, na základě ní volá ve správné časy StateHasChanged
+    /// Tuto eventu zachytává datová komponenta, přes ní se volá na GUI StateHasChanged
     /// </summary>
     public event EventHandler? BlazorStateHasChanged;
 
@@ -19,7 +23,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     CancellationTokenSource? _loopCts;
 
     /// <summary>
-    /// Stav GUI: Loading, Loaded (with data), Error
+    /// Stav GUI: Loading, Loaded, Error
     /// </summary>
     public IGuiState? GuiState
     {
@@ -43,8 +47,6 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
 
     /// <summary>
     /// Je-li NULL, cache prohlížeče se nepoužije. Má-li hodnotu, definuje způsob cachování.
-    /// Browser cache je dvojího typu: session storage a local storage.
-    /// Správné využití šetří requesty na server a recykluje data načtená nedávno apod.
     /// </summary>
     public BrowserCacheUsage? CacheUsage { get; init; } = cacheUsage;
 

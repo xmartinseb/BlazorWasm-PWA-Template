@@ -38,8 +38,8 @@
         currentLocalCount ??= BrowserStoredValueFactory.Create<int>(StorageKey, BrowserStorageType.Local);
         currentSessionCount ??= BrowserStoredValueFactory.Create<int>(StorageKey, BrowserStorageType.Session);
 
-        NotifyLoadError(await currentLocalCount.LoadAsync(0));
-        NotifyLoadError(await currentSessionCount.LoadAsync(0));
+        NotifyIfError(await currentLocalCount.LoadAsync(0));
+        NotifyIfError(await currentSessionCount.LoadAsync(0));
         StateHasChanged(); // Vynutíme přerenderování UI po prvním načtení hodnot z JS
     }
 
@@ -47,7 +47,7 @@
     {
         // Tato hodnota mohla být změněna v jiné záložce, proto se načte znovu (zabrání to konflikům záložek)
         var localValResult = await currentLocalCount.LoadAsync(0);
-        if (NotifyLoadError(localValResult))
+        if (NotifyIfError(localValResult))
             return;
         await currentLocalCount.SetAsync(localValResult.Value + 1);
     }
@@ -55,14 +55,14 @@
     async Task IncrementSessionCount()
     { 
         // Tato hodnota mohla být mezitím změněna z jiné záložky (aktualizace GUI))
-        NotifyLoadError(await currentLocalCount.LoadAsync(0));
+        NotifyIfError(await currentLocalCount.LoadAsync(0));
         
         // Hodnota patří jen této záložce, není třeba volat Load, stačí Set. 
         // Jen nebude fungovat uživatelský zásah do hodnoty skrze console browseru, ale to nevadí.
         await currentSessionCount.SetAsync(currentSessionCount.Value + 1);
     }
 
-    bool NotifyLoadError(Result<int> r)
+    bool NotifyIfError(Result<int> r)
     {
         if (!r.Succeeded)
             NotificationService.Error($"Selhalo načítání čítače: {string.Join("; ", r.Errors)}");

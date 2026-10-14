@@ -1,10 +1,15 @@
-﻿@typeparam TData
+﻿@* 
+    Komponenta pro zobrazování dat ze serveru apod:
+    1) Umí GUI stavy: Loading, Loaded<TData>, Error. Mezi stavy umí přecházet
+    2) Ovládá se přes view model DataViewModel<TData>, který umožňuje periodický reload dat, cachování dat do browseru atd.
+*@
+@typeparam TData
 @implements IDisposable
 
 @if (ViewModel is { GuiState: not null })
 {
-        <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
-                     ErrorContent="ErrorContent" OnRetry="OnRetryAsync">
+    <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
+                    ErrorContent="ErrorContent" OnRetry="OnRetryAsync">
         @ChildContent?.Invoke(data.Data)
         @if (ShowTimestamp)
         {

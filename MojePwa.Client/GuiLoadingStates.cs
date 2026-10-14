@@ -4,7 +4,7 @@ public interface IGuiState
 }
 
 /// <summary>
-/// Možné přechody: Loading -> Loaded, Error
+/// Stav, kdy komponenta načítá data a zobrazuje loading zprávu
 /// </summary>
 public sealed class StateLoading(string message) : IGuiState
 {
@@ -12,22 +12,23 @@ public sealed class StateLoading(string message) : IGuiState
 }
 
 /// <summary>
-/// Možné přechody: Loaded -> Reloading (update dat, ale stará data jsou stále zobrazena)
-/// Poté: Reloading -> Loaded, Error
+/// Stav, kdy komponenta zobrazuje načtená data
 /// </summary>
 public sealed class StateLoaded<TLoadedData>(TLoadedData loadedData) : IGuiState
 {
     public TLoadedData LoadedData { get; set; } = loadedData;
 
     /// <summary>
-    /// Popisuje stav, kdy se zobrazují data a na pozadí běží načítání nových dat (např. po kliknutí na tlačítko "Obnovit").
-    /// Bylo by nevhodné přepínat znovu do stavu Loading, protože by uživatel ztratil přehled o starých datech, která jsou stále zobrazena.
+    /// Reload dat ve stavu Loaded se nedělá zpátky přes stav Loading, protože by zmizela dříve načtená data.
+    /// Místo toho se pod načtenými daty při reloadingu zobrazuje progress bar.
+    /// Když je TRUE, je zobrazen ten progress bar.
     /// </summary>
     public bool IsReloading { get; set; }
 }
 
 /// <summary>
-/// Možné přechody: Error -> Loading (retry)
+/// Stav, kdy je uživateli zobrazena chyba načítání.
+/// Je možné načíst data znovu přes Reload button, pokud se nabízí.
 /// </summary>
 public sealed class StateError(IReadOnlyList<string> errors) : IGuiState
 {
