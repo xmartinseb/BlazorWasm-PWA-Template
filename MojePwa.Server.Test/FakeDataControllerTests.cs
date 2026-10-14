@@ -1,91 +1,94 @@
-using Microsoft.AspNetCore.Mvc;
 using MojePwa.Domain.Dto;
-using MojePwa.Server.Controllers;
-using MojePwa.Server.Services;
+using System.Net;
+using System.Net.Http.Json;
 using Xunit;
 
 namespace MojePwa.Server.Test;
 
-public sealed class FakeDataControllerTests
+public sealed class FakeDataControllerTests : ControllerTestsBase
 {
+    protected override string ControllerUrl => "/api/fake-data";
+
     [Fact]
-    public void GetAll_ReturnsValuesFromFakeDataService()
+    public Task GetAll_ReturnsValuesFromFakeDataService()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        var key1 = new string('a', SetFakeDbKeyRequestDto.MaxInputLength);
-        var key2 = new string('b', SetFakeDbKeyRequestDto.MaxInputLength);
+        var input1 = new SetFakeDbKeyRequestDto(new string('a', SetFakeDbKeyRequestDto.MaxInputLength), "value1");
+        var input2 = new SetFakeDbKeyRequestDto(new string('b', SetFakeDbKeyRequestDto.MaxInputLength), "value2");
 
-        Assert.IsType<NoContentResult>(controller.SetKey(new SetFakeDbKeyRequestDto(key1, "value1")));
-        Assert.IsType<NoContentResult>(controller.SetKey(new SetFakeDbKeyRequestDto(key2, "value2")));
+        AssertNoContent(await client.PutAsJsonAsync(ControllerUrl, input1));
+        AssertNoContent(await client.PutAsJsonAsync(ControllerUrl, input2));
 
-        var result = controller.GetAll();
+        var result = await client.GetFromJsonAsync<Dictionary<string, string>>(ControllerUrl);
+        Assert.NotNull(result);
         Assert.Equal(2, result.Count);
-        Assert.Equal("value1", result[key1]);
-        Assert.Equal("value2", result[key2]);
-    }
+        Assert.Equal(input1.Value, result[input1.Key]);
+        Assert.Equal(input2.Value, result[input2.Key]);
+    });
 
     [Fact]
-    public void GetValue_ReturnsStoredValue()
+    public Task GetValue_ReturnsStoredValue()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        controller.SetKey(new SetFakeDbKeyRequestDto("name", "value"));
+        var input = new SetFakeDbKeyRequestDto("name", "value");
+        AssertNoContent(await client.PutAsJsonAsync(ControllerUrl, input));
 
-        var result = controller.GetValue("name");
-        Assert.Equal("value", result.Value);
-    }
+        var response = await client.GetAsync($"{ControllerUrl}/{input.Key}");
+        AssertOk(response);
+        Assert.Equal(input.Value, await response.Content.ReadAsStringAsync());
+    });
 
     [Fact]
-    public void DeleteKey_ReturnsNoContentThenNotFound()
+    public Task DeleteKey_ReturnsNoContentThenNotFound()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        controller.SetKey(new SetFakeDbKeyRequestDto("name", "value"));
+        var input = new SetFakeDbKeyRequestDto("name", "value");
+        await client.PutAsJsonAsync(ControllerUrl, input);
 
-        var deleteResult = controller.DeleteKey("name");
-        var missingResult = controller.DeleteKey("name");
-
-        Assert.IsType<NoContentResult>(deleteResult);
-        Assert.IsType<NotFoundResult>(missingResult);
-    }
+        AssertNoContent(await client.DeleteAsync($"{ControllerUrl}/{input.Key}"));
+        AssertNotFound(await client.DeleteAsync($"{ControllerUrl}/{input.Key}"));
+    });
 
     [Fact]
-    public void SetTooLongKey_Returns400()
+    public Task SetTooLongKey_Returns400()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        var tooLongKey = new string('a', SetFakeDbKeyRequestDto.MaxInputLength + 1);
-        var result = controller.SetKey(new SetFakeDbKeyRequestDto(tooLongKey, "a"));
-        Assert.IsType<BadRequestResult>(result);
-    }
+        var input = new SetFakeDbKeyRequestDto(new string('a', SetFakeDbKeyRequestDto.MaxInputLength + 1), "value");
+        AssertBadReq(await client.PutAsJsonAsync(ControllerUrl, input));
+    });
 
     [Fact]
-    public void SetTooLongValue_Returns400()
+    public Task SetTooLongValue_Returns400()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        var tooLongValue = new string('a', SetFakeDbKeyRequestDto.MaxInputLength + 1);
-        var result = controller.SetKey(new SetFakeDbKeyRequestDto("a", tooLongValue));
-        Assert.IsType<BadRequestResult>(result);
-    }
+        var input = new SetFakeDbKeyRequestDto("key", new string('a', SetFakeDbKeyRequestDto.MaxInputLength + 1));
+        AssertBadReq(await client.PutAsJsonAsync(ControllerUrl, input));
+    });
 
     [Fact]
-    public void SetKey_StoresValueAndReturnsNoContent()
+    public Task SetKey_StoresValueAndReturnsNoContent()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        var result = controller.SetKey(new SetFakeDbKeyRequestDto("name", "value"));
+        var input = new SetFakeDbKeyRequestDto("name", "value");
+        var response = await client.PutAsJsonAsync(ControllerUrl, input);
 
-        Assert.IsType<NoContentResult>(result);
-        Assert.Equal("value", controller.GetValue("name").Value);
-    }
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        response = await client.GetAsync($"{ControllerUrl}/{input.Key}");
+        Assert.Equal(input.Value, await response.Content.ReadAsStringAsync());
+    });
 
     [Fact]
-    public void TryAddKey_ReturnsCreatedThenConflict()
+    public Task TryAddKey_ReturnsCreatedThenConflict()
+        => DoAsync(async client =>
     {
-        var controller = new FakeDataController(new FakeDataService());
-        var request = new SetFakeDbKeyRequestDto("name", "first");
+        var input = new SetFakeDbKeyRequestDto("name", "funguje");
+        var reInput = input with { Value = "zamitnuto" };
 
-        var createdResult = controller.TryAddKey(request);
-        var conflictResult = controller.TryAddKey(new SetFakeDbKeyRequestDto("name", "second"));
+        AssertCreated(await client.PostAsJsonAsync($"{ControllerUrl}/try-add-key", input));
+        AssertConflict(await client.PostAsJsonAsync($"{ControllerUrl}/try-add-key", reInput));
 
-        Assert.Equal(201, Assert.IsType<CreatedResult>(createdResult).StatusCode);
-        Assert.IsType<ConflictResult>(conflictResult);
-        Assert.Equal("first", controller.GetValue("name").Value);
-    }
+        var response = await client.GetAsync($"{ControllerUrl}/{input.Key}");
+        AssertOk(response);
+        Assert.Equal(input.Value, await response.Content.ReadAsStringAsync());
+    });
 }
