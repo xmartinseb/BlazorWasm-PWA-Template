@@ -5,4 +5,6 @@ namespace MojePwa.Domain.Dto;
 /// <summary>
 /// Ve fake databázi nastavuje hodnotu pro daný klíč
 /// </summary>
-public readonly record struct SetFakeDbKeyRequestDto([Required] string Key, string Value);
+public readonly record struct SetFakeDbKeyRequestDto(
+    [property: Required, MaxLength(16)] string Key, 
+    [property: MaxLength(16)] string Value);

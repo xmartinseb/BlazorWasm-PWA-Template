@@ -42,7 +42,7 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
     }
 
     /// <summary>
-    /// Operace “vytvoř, pokud neexistuje” a vrať bool není čistý idempotentní PUT. Proto je to POST.
+    /// Operace “vytvoř, pokud neexistuje” není čistý idempotentní PUT. Proto je to POST.
     /// Vrací se: 201 Created nebo 409 Conflict. 
     /// Aby to byl čistý PUT, přidal bych header If-None-Match: *, kdy server odpoví 412 Precondition Failed, pokud klíč existuje.
     /// </summary>
