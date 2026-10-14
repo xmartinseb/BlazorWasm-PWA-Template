@@ -17,7 +17,7 @@
 
         <RadzenStack Gap="0.25rem">
             <RadzenFormField Text="Value" Variant="Variant.Outlined">
-                <RadzenTextArea @bind-Value="NewFakeDataVm.Value" MaxLength="128" />
+                <RadzenTextArea @bind-Value="NewFakeDataVm.Value" MaxLength="16" />
             </RadzenFormField>
             <ValidationMessage For="() => NewFakeDataVm.Value" style="color: var(--rz-danger)" />
         </RadzenStack>
@@ -86,12 +86,12 @@
 
     public class ViewModel
     {
-        [Required]
-        [StringLength(16)]
+        [Required(ErrorMessage = "Zadejte klíč")]
+        [StringLength(16, ErrorMessage = "Maximální délka klíče je {1} znaků")]
         public string Key { get; set; } = "";
 
-        [Required]
-        [StringLength(128)]
+        [Required(ErrorMessage = "Zadejte hodnotu")]
+        [StringLength(16, ErrorMessage = "Maximální délka hodnoty je {1} znaků")]
         public string Value { get; set; } = "";
     }
 }

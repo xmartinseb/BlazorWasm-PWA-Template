@@ -1,6 +1,7 @@
 <Solution>
+  <Project Path="Base/Base.csproj" Id="aa01db7a-bd30-406a-bbe3-61189fd445e3" />
   <Project Path="MojePwa.Client/MojePwa.Client.csproj" />
   <Project Path="MojePwa.Domain/MojePwa.Domain.csproj" />
-  <Project Path="MojePwa.Server/MojePwa.Server.csproj" />
   <Project Path="MojePwa.Server.Test/MojePwa.Server.Test.csproj" />
+  <Project Path="MojePwa.Server/MojePwa.Server.csproj" />
 </Solution>

@@ -82,7 +82,7 @@ public sealed class FakeDataControllerTests : ControllerTestsBase
         => DoAsync(async client =>
     {
         var input = new SetFakeDbKeyRequestDto("name", "funguje");
-        var reInput = input with { Value = "zamitnuto" };
+        var reInput = new SetFakeDbKeyRequestDto("name", "zamitnuto");
 
         AssertCreated(await client.PostAsJsonAsync($"{ControllerUrl}/try-add-key", input));
         AssertConflict(await client.PostAsJsonAsync($"{ControllerUrl}/try-add-key", reInput));
