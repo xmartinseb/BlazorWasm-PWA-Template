@@ -2,4 +2,5 @@
   <Project Path="MojePwa.Client/MojePwa.Client.csproj" />
   <Project Path="MojePwa.Domain/MojePwa.Domain.csproj" />
   <Project Path="MojePwa.Server/MojePwa.Server.csproj" />
+  <Project Path="MojePwa.Server.Test/MojePwa.Server.Test.csproj" />
 </Solution>
