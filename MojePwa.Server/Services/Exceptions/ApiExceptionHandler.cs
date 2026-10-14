@@ -18,6 +18,7 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
         var (status, title, detail) = ex switch
         {
             UserFriendlyException uex => (uex.HttpStatus, uex.Title, uex.Message),
+            OperationCanceledException { CancellationToken.IsCancellationRequested: true} => (StatusCodes.Status499ClientClosedRequest, "Client closed request", "Client closed request"),
             ArgumentNullException => (StatusCodes.Status400BadRequest, "Bad Request", "A required argument is missing"),
             ArgumentOutOfRangeException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is outside the permitted range"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is invalid"),
