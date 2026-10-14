@@ -45,11 +45,11 @@
 
     async Task AddFakeDataClick()
     {
-        if (await AddFakeDataDialog.ShowAsync(DialogService) is { } dialogResult
+        if (await AddFakeDataDialog.ShowAsync(DialogService) is { } addedRecord
             && DataViewModel?.TryGetLoadedData() is { } loadedData)
         {
-            loadedData.FakeData[dialogResult.NewKey] = dialogResult.NewValue;
-            await DataViewModel!.StoreCacheAsync(loadedData, _lifetimeCts.Token);
+            loadedData.FakeData[addedRecord.Key] = addedRecord.Value;
+            await DataViewModel.StoreCacheAsync(loadedData, _lifetimeCts.Token);
         }
     }
 

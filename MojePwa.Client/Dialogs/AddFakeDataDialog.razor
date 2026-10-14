@@ -35,8 +35,6 @@
     [Parameter]
     public ViewModel NewFakeDataVm { get; set; } = new();
 
-    public readonly record struct AddFakeDataDialogResult(string NewKey, string NewValue);
-
     bool busy;
     readonly CancellationTokenSource _cts = new();
 
@@ -50,7 +48,7 @@
             if (result.Succeeded)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Uloženo", "Fake data byla nahrána na server");
-                DialogService.Close(new AddFakeDataDialogResult(NewFakeDataVm.Key, NewFakeDataVm.Value));
+                DialogService.Close(NewFakeDataVm);
             }
             else
             {
@@ -73,7 +71,7 @@
         _cts.Dispose();
     }
 
-    public static async Task<AddFakeDataDialogResult?> ShowAsync(DialogService dialogService)
+    public static async Task<ViewModel?> ShowAsync(DialogService dialogService)
     {
         var title = "Přidat fake data";
         var result = await dialogService.OpenAsync<AddFakeDataDialog>(title, new Dictionary<string, object?>
@@ -84,7 +82,7 @@
         return result;
     }
 
-    public class ViewModel
+    public sealed class ViewModel
     {
         [Required(ErrorMessage = "Zadejte klíč")]
         [StringLength(16, ErrorMessage = "Maximální délka klíče je {1} znaků")]
