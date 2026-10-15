@@ -10,7 +10,8 @@ namespace MojePwa.Client.Models;
 /// <param name="dataReloadPeriod">Perioda stahování čerstvých dat ze serveru pomocí timeru. Je-li NULL, reload neprobíhá</param>
 /// <param name="cacheUsage">Způsob využití cache v browseru, což může ušetřit přenosy dat. Je-li NULL, nepoužívá se cache</param>
 /// <param name="browserTtlCache">Přístup k cache browseru. Pokud je cache usage NOT NULL, toto je taky NOT NULL</param>
-public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, BrowserCacheUsage? cacheUsage, BrowserTtlCache? browserTtlCache)
+public abstract class DataViewModel<TViewModel, TDataLoaded>(TimeSpan? dataReloadPeriod, BrowserCacheUsage? cacheUsage, BrowserTtlCache? browserTtlCache)
+    where TViewModel : class
 {
     /// <summary>
     /// Tuto eventu zachytává datová komponenta, přes ní se volá na GUI StateHasChanged
@@ -56,6 +57,16 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     public abstract Task<Result<TDataLoaded>> LoadFreshDataAsync(CT ct);
 
     /// <summary>
+    /// Vytvoří view model při prvním úspěšném načtení dat
+    /// </summary>
+    public abstract TViewModel CreateViewModel(TDataLoaded firstLoadedData);
+
+    /// <summary>
+    /// Aktualizuje existující view model nově načtenými daty
+    /// </summary>
+    public abstract void UpdateViewModel(TViewModel currentViewModel, TDataLoaded newData);
+
+    /// <summary>
     /// Zavolá se po kliknutí na tlačítko Retry, které se umí zobrazit v GUI stavu Error
     /// </summary>
     public Task OnRetryClickAsync(CT ct) => LoadAndSetGuiStateAsync("loading...", ct);
@@ -66,7 +77,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     public async Task LoadAndSetGuiStateAsync(string loadingMessage, CT ct)
     {
         // Pokud už data byla načtena, jen se aktivuje IsReloading. Pokud ještě nejsou, začíná se stavem Loading 
-        if (GuiState is not StateLoaded<DataWithTimestamp<TDataLoaded>>)
+        if (GuiState is not StateLoaded<DataWithTimestamp<TViewModel>>)
             GuiState = new StateLoading(loadingMessage);
 
         try
@@ -74,9 +85,26 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
             SetIsReloadingIfAlreadyLoaded(true);
             var result = await LoadFromCacheOrLoadFresh(ct);
             if (result.Succeeded)
-                GuiState = result.Value is { } data
-                    ? new StateLoaded<DataWithTimestamp<TDataLoaded>>(data)
-                    : new StateError("Byla načtena prázdná odpověď NULL");
+            {
+                if (result.Value is { } data)
+                {
+                    if (GuiState is StateLoaded<DataWithTimestamp<TViewModel>> loaded)
+                    {
+                        UpdateViewModel(loaded.LoadedData.Data, data.Data);
+                        loaded.LoadedData = new DataWithTimestamp<TViewModel>(loaded.LoadedData.Data, data.Loaded);
+                        RaiseBlazorStateHasChanged();
+                    }
+                    else
+                    {
+                        GuiState = new StateLoaded<DataWithTimestamp<TViewModel>>(
+                            new DataWithTimestamp<TViewModel>(CreateViewModel(data.Data), data.Loaded));
+                    }
+                }
+                else
+                {
+                    GuiState = new StateError("Byla načtena prázdná odpověď NULL");
+                }
+            }
             else
                 GuiState = new StateError(result.Errors);
         }
@@ -102,7 +130,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
         // Pomocná: pokud jsou již data načtena, zobrazí/skryje se pod komponentou loading progress bar
         void SetIsReloadingIfAlreadyLoaded(bool isReloading)
         {
-            if (GuiState is StateLoaded<DataWithTimestamp<TDataLoaded>> loaded)
+            if (GuiState is StateLoaded<DataWithTimestamp<TViewModel>> loaded)
             {
                 loaded.IsReloading = isReloading;
                 RaiseBlazorStateHasChanged();
@@ -113,8 +141,8 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     /// <returns>
     /// Pokud jsme ve stavu Loaded, vrátí načtená data, jinak NULL
     /// </returns>
-    public TDataLoaded? TryGetLoadedData() 
-        => GuiState is StateLoaded<DataWithTimestamp<TDataLoaded>> loaded 
+    public TViewModel? TryGetViewModel()
+        => GuiState is StateLoaded<DataWithTimestamp<TViewModel>> loaded
             ? loaded.LoadedData.Data 
             : default;
 
@@ -172,7 +200,7 @@ public abstract class DataViewModel<TDataLoaded>(TimeSpan? dataReloadPeriod, Bro
     TimeSpan GetNextDelay()
     {
         var delay = DataReloadPeriod!.Value;
-        if (CacheUsage is { } cu && GuiState is StateLoaded<DataWithTimestamp<TDataLoaded>> l)
+        if (CacheUsage is { } cu && GuiState is StateLoaded<DataWithTimestamp<TViewModel>> l)
         {
             var untilExpiry = l.LoadedData.Loaded + cu.CacheTTL - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(20);
             if (untilExpiry > delay) delay = untilExpiry;

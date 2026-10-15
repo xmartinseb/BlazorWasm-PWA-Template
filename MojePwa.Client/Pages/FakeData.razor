@@ -6,7 +6,7 @@
 
 <h2>Fake Data</h2>
 <div>
-    <DataComponent TData="LoadedDataVm" ViewModel="DataViewModel" Context="vm">
+    <DataComponent TViewModel="LoadedDataVm" TDataLoaded="Dictionary<string, string>" ViewModel="DataViewModel" Context="vm">
         @switch (vm.FakeData.Count)
         {
             case 0:
@@ -30,26 +30,38 @@
     FakeDataViewModel? DataViewModel { get; set; }
     readonly CancellationTokenSource _lifetimeCts = new();
 
-    sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<LoadedDataVm>(
+    sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<LoadedDataVm, Dictionary<string, string>>(
         dataReloadPeriod: TimeSpan.FromSeconds(5),
         cacheUsage: new(TimeSpan.FromSeconds(3), BrowserStorageType.Session, cacheKey: "FAKE_DATA"),
         cache)
     {
-        public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
-            => Result.Ok(new LoadedDataVm((await fakeDataService.GetAllDataAsync(ct)).Unwrap()));
+        public override async Task<Result<Dictionary<string, string>>> LoadFreshDataAsync(CT ct)
+            => Result.Ok((await fakeDataService.GetAllDataAsync(ct)).Unwrap());
+
+        public override LoadedDataVm CreateViewModel(Dictionary<string, string> firstLoadedData) => new(firstLoadedData);
+
+        public override void UpdateViewModel(LoadedDataVm currentViewModel, Dictionary<string, string> newData)
+        {
+            currentViewModel.FakeData.Clear();
+            foreach (var item in newData)
+                currentViewModel.FakeData[item.Key] = item.Value;
+        }
     }
 
-    sealed record LoadedDataVm(Dictionary<string, string> FakeData);
+    sealed class LoadedDataVm(Dictionary<string, string> fakeData)
+    {
+        public Dictionary<string, string> FakeData { get; } = fakeData;
+    }
 
     protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, FakeDataService);
 
     async Task AddFakeDataClick()
     {
         if (await AddFakeDataDialog.ShowAsync(DialogService) is { } addedRecord
-            && DataViewModel?.TryGetLoadedData() is { } loadedData)
+            && DataViewModel?.TryGetViewModel() is { } loadedData)
         {
             loadedData.FakeData[addedRecord.Key] = addedRecord.Value;
-            await DataViewModel.StoreCacheAsync(loadedData, _lifetimeCts.Token);
+            await DataViewModel.StoreCacheAsync(loadedData.FakeData, _lifetimeCts.Token);
         }
     }
 

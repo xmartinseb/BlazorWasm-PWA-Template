@@ -4,11 +4,11 @@
 
 <h2>Test API</h2>
 <div>
-    <DataComponent TData="string" ViewModel="DataViewModels[0]" Context="text">
-        <span>@text</span>
+    <DataComponent TViewModel="TestViewModel" TDataLoaded="string" ViewModel="DataViewModels[0]" Context="viewModel">
+        <span>@viewModel.Value</span>
     </DataComponent>
-    <DataComponent TData="string" ViewModel="DataViewModels[1]" Context="text">
-        <span>@text</span>
+    <DataComponent TViewModel="TestViewModel" TDataLoaded="string" ViewModel="DataViewModels[1]" Context="viewModel">
+        <span>@viewModel.Value</span>
     </DataComponent>
 </div>
 
@@ -17,13 +17,23 @@
     
     readonly CancellationTokenSource _lifetimeCts = new();
 
-    sealed class TestApiViewModel(ITestApiService testApiService) : DataViewModel<string>(
+    sealed class TestApiViewModel(ITestApiService testApiService) : DataViewModel<TestViewModel, string>(
         dataReloadPeriod: TimeSpan.FromSeconds(3),
         cacheUsage: null,
         browserTtlCache: null)
     {
         public override async Task<Result<string>> LoadFreshDataAsync(CT ct)
             => Result.Ok((await testApiService.TestApiGetAsync(ct)).Unwrap());
+
+        public override TestViewModel CreateViewModel(string firstLoadedData) => new(firstLoadedData);
+
+        public override void UpdateViewModel(TestViewModel currentViewModel, string newData)
+            => currentViewModel.Value = newData;
+    }
+
+    sealed class TestViewModel(string value)
+    {
+        public string Value { get; set; } = value;
     }
 
     protected override void OnInitialized() => DataViewModels = [new(TestApiService), new(TestApiService)];

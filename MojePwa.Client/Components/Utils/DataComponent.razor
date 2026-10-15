@@ -1,14 +1,15 @@
 ﻿@* 
     Komponenta pro zobrazování dat ze serveru apod:
     1) Umí GUI stavy: Loading, Loaded<TData>, Error. Mezi stavy umí přecházet
-    2) Ovládá se přes view model DataViewModel<TData>, který umožňuje periodický reload dat, cachování dat do browseru atd.
+    2) Ovládá se přes view model DataViewModel<TViewModel, TDataLoaded>, který umožňuje periodický reload dat, cachování dat do browseru atd.
 *@
-@typeparam TData
+@typeparam TViewModel where TViewModel : class
+@typeparam TDataLoaded
 @implements IDisposable
 
 @if (ViewModel is { GuiState: not null })
 {
-    <StateSwitch TData="DataWithTimestamp<TData>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
+    <StateSwitch TData="DataWithTimestamp<TViewModel>" Context="data" State="ViewModel.GuiState" LoadingContent="LoadingContent"
                     ErrorContent="ErrorContent" OnRetry="OnRetryAsync">
         @ChildContent?.Invoke(data.Data)
         @if (ShowTimestamp)
@@ -21,10 +22,10 @@
 }
 
 @code {
-    [Parameter] public RenderFragment<TData>? ChildContent { get; set; }
+    [Parameter] public RenderFragment<TViewModel>? ChildContent { get; set; }
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
-    [Parameter] public DataViewModel<TData> ViewModel { get; set; } = null!;
+    [Parameter] public DataViewModel<TViewModel, TDataLoaded> ViewModel { get; set; } = null!;
 
     /// <summary>
     /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
@@ -61,7 +62,7 @@
             await ViewModel.LoadAndSetGuiStateAsync("Loading...", _lifetimeCts.Token);
     }
 
-    DataViewModel<TData>? _subscribed;
+    DataViewModel<TViewModel, TDataLoaded>? _subscribed;
     CancellationTokenSource? _lifetimeCts;
 
     Task OnRetryAsync() => ViewModel.OnRetryClickAsync(_lifetimeCts!.Token);

@@ -4,7 +4,7 @@
 @inject BrowserTtlCache BrowserTtlCache
 
 <h2>Weather</h2>
-<DataComponent TData="LoadedDataVm" ViewModel="DataViewModel" Context="vm">
+<DataComponent TViewModel="LoadedDataVm" TDataLoaded="WeatherForecast[]" ViewModel="DataViewModel" Context="vm">
     <RadzenDataGrid Data="@vm.Forecasts" TItem="WeatherForecast" AllowSorting="true">
         <Columns>
             <RadzenDataGridColumn TItem="WeatherForecast" Property="Date" Title="Date" FormatString="{0:d}" />
@@ -18,16 +18,24 @@
 @code {
     WeatherDataViewModel? DataViewModel { get; set; }
 
-    sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm>(
+    sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm, WeatherForecast[]>(
             dataReloadPeriod: TimeSpan.FromSeconds(2),
             cacheUsage: new(TimeSpan.FromSeconds(1), BrowserStorageType.Session, cacheKey: "WEATHER"),
             cache)
     {
-        public override async Task<Result<LoadedDataVm>> LoadFreshDataAsync(CT ct)
-            => Result.Ok(new LoadedDataVm((await weatherService.GetForecastAsync(ct)).Unwrap()));
+        public override async Task<Result<WeatherForecast[]>> LoadFreshDataAsync(CT ct)
+            => Result.Ok((await weatherService.GetForecastAsync(ct)).Unwrap());
+
+        public override LoadedDataVm CreateViewModel(WeatherForecast[] firstLoadedData) => new(firstLoadedData);
+
+        public override void UpdateViewModel(LoadedDataVm currentViewModel, WeatherForecast[] newData)
+            => currentViewModel.Forecasts = newData;
     }
 
-    sealed record LoadedDataVm(WeatherForecast[] Forecasts);
+    sealed class LoadedDataVm(WeatherForecast[] forecasts)
+    {
+        public WeatherForecast[] Forecasts { get; set; } = forecasts;
+    }
 
     protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, WeatherService);
 }
