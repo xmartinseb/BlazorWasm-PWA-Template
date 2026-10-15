@@ -4,8 +4,8 @@
 @inject BrowserTtlCache BrowserTtlCache
 
 <h2>Weather</h2>
-<DataComponent TViewModel="LoadedDataVm" TDataLoaded="WeatherForecast[]" ViewModel="DataViewModel" Context="vm">
-    <RadzenDataGrid Data="@vm.Forecasts" TItem="WeatherForecast" AllowSorting="true">
+<DataComponent TViewModel="LoadedDataVm" TDataLoaded="WeatherForecast[]" ViewModel="DataViewModel" OnViewModelUpdated="RefreshGridAsync" Context="vm">
+    <RadzenDataGrid @ref="_weatherGrid" Data="@vm.Forecasts" TItem="WeatherForecast" AllowSorting="true">
         <Columns>
             <RadzenDataGridColumn TItem="WeatherForecast" Property="Date" Title="Date" FormatString="{0:d}" />
             <RadzenDataGridColumn TItem="WeatherForecast" Property="TemperatureC" Title="Temp. (C)" />
@@ -17,6 +17,7 @@
 
 @code {
     WeatherDataViewModel? DataViewModel { get; set; }
+    RadzenDataGrid<WeatherForecast>? _weatherGrid;
 
     sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm, WeatherForecast[]>(
             dataReloadPeriod: TimeSpan.FromSeconds(2),
@@ -36,6 +37,8 @@
     }
 
     sealed record LoadedDataVm(List<WeatherForecast> Forecasts);
+
+    Task RefreshGridAsync() => _weatherGrid?.RefreshDataAsync() ?? Task.CompletedTask;
 
     protected override void OnInitialized() => DataViewModel = new(BrowserTtlCache, WeatherService);
 }

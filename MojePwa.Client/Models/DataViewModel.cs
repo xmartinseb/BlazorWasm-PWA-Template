@@ -19,6 +19,11 @@ public abstract class DataViewModel<TViewModel, TDataLoaded>(TimeSpan? dataReloa
     public event EventHandler? BlazorStateHasChanged;
 
     /// <summary>
+    /// Vyvolá se po aktualizaci existujícího view modelu novými daty
+    /// </summary>
+    public event EventHandler? ViewModelUpdated;
+
+    /// <summary>
     /// Zabraňuje vícenásobnému načítání dat najednou
     /// </summary>
     CancellationTokenSource? _loopCts;
@@ -93,6 +98,7 @@ public abstract class DataViewModel<TViewModel, TDataLoaded>(TimeSpan? dataReloa
                         UpdateViewModel(loaded.LoadedData.Data, data.Data);
                         loaded.LoadedData = new DataWithTimestamp<TViewModel>(loaded.LoadedData.Data, data.Loaded);
                         RaiseBlazorStateHasChanged();
+                        ViewModelUpdated?.Invoke(this, EventArgs.Empty);
                     }
                     else
                     {

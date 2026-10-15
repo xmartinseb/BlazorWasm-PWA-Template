@@ -26,6 +26,7 @@
     [Parameter] public RenderFragment<StateLoading>? LoadingContent { get; set; }
     [Parameter] public RenderFragment<StateError>? ErrorContent { get; set; }
     [Parameter] public DataViewModel<TViewModel, TDataLoaded> ViewModel { get; set; } = null!;
+    [Parameter] public EventCallback OnViewModelUpdated { get; set; }
 
     /// <summary>
     /// Pokud je true, pod vypsanými daty se vypíše lokální čas poslední aktualizace dat
@@ -43,6 +44,7 @@
         if (_subscribed is not null)
         {
             _subscribed.BlazorStateHasChanged -= OnBlazorStateHasChanged;
+            _subscribed.ViewModelUpdated -= OnViewModelUpdatedFromModel;
             _subscribed.StopPeriodicReload();
         }
         _lifetimeCts?.Cancel();
@@ -50,6 +52,7 @@
         _lifetimeCts = new();
         _subscribed = ViewModel;
         ViewModel.BlazorStateHasChanged += OnBlazorStateHasChanged;
+        ViewModel.ViewModelUpdated += OnViewModelUpdatedFromModel;
 
         var currentCacheKey = ViewModel.CacheUsage?.CacheKey;
 
@@ -69,11 +72,18 @@
 
     async void OnBlazorStateHasChanged(object? sender, EventArgs e) => await InvokeAsync(StateHasChanged);
 
+    async void OnViewModelUpdatedFromModel(object? sender, EventArgs e)
+    {
+        if (OnViewModelUpdated.HasDelegate)
+            await InvokeAsync(() => OnViewModelUpdated.InvokeAsync());
+    }
+
     public void Dispose() 
     {
         if (_subscribed is not null)
         {
             _subscribed.BlazorStateHasChanged -= OnBlazorStateHasChanged;
+            _subscribed.ViewModelUpdated -= OnViewModelUpdatedFromModel;
             _subscribed.StopPeriodicReload();
         }
         _lifetimeCts?.Cancel();
