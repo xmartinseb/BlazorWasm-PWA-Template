@@ -1,5 +1,5 @@
 self.importScripts('./service-worker-assets.js');
-self.importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
+// self.importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.0.0/workbox-sw.js');
 self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => {
@@ -57,18 +57,18 @@ async function onFetch(event) {
 }
 
 
-if (workbox) {
-    // Nastavení Background Sync pluginu pro Outbox frontu
-    const bgSyncPlugin = new workbox.backgroundSync.BackgroundSyncPlugin('apiOfflineQueue', {
-        maxRetentionTime: 24 * 60 // Zkusí neodeslané požadavky posílat po dobu 24 hodin
-    });
+// if (workbox) {
+//     // Nastavení Background Sync pluginu pro Outbox frontu
+//     const bgSyncPlugin = new workbox.backgroundSync.BackgroundSyncPlugin('apiOfflineQueue', {
+//         maxRetentionTime: 24 * 60 // Zkusí neodeslané požadavky posílat po dobu 24 hodin
+//     });
 
-    // Zachytávání POST/PUT/DELETE požadavků na API
-    workbox.routing.registerRoute(
-        ({ url }) => url.pathname.startsWith('/api/'),
-        new workbox.strategies.NetworkOnly({
-            plugins: [bgSyncPlugin]
-        }),
-        ['POST', 'PUT', 'DELETE']
-    );
-}
+//     // Zachytávání POST/PUT/DELETE požadavků na API
+//     workbox.routing.registerRoute(
+//         ({ url }) => url.pathname.startsWith('/api/'),
+//         new workbox.strategies.NetworkOnly({
+//             plugins: [bgSyncPlugin]
+//         }),
+//         ['POST', 'PUT', 'DELETE']
+//     );
+// }
