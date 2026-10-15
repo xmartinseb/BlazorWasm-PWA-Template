@@ -24,16 +24,14 @@
             cacheUsage: new(TimeSpan.FromSeconds(1), BrowserStorageType.Session, cacheKey: "WEATHER"),
             cache)
     {
-        public override Task<Result<WeatherForecast[]>> LoadFreshDataAsync(CT ct) => weatherService.GetForecastAsync(ct);
+        public override Task<Result<WeatherForecast[]>> LoadFreshDataAsync(CT ct) 
+            => weatherService.GetForecastAsync(ct);
 
-        public override LoadedDataVm CreateViewModel(WeatherForecast[] firstLoadedData) => new(firstLoadedData.ToList());
+        public override LoadedDataVm CreateViewModel(WeatherForecast[] firstLoadedData) 
+            => new(firstLoadedData.ToList());
 
-        public override void UpdateViewModel(LoadedDataVm currentViewModel, WeatherForecast[] newData)
-        {
-            currentViewModel.Forecasts.Clear();
-            currentViewModel.Forecasts.AddRange(newData);
-        }
-
+        public override void UpdateViewModel(LoadedDataVm currentViewModel, WeatherForecast[] newData)  
+            => currentViewModel.Forecasts.ClearAddRange(newData);
     }
 
     sealed record LoadedDataVm(List<WeatherForecast> Forecasts);
