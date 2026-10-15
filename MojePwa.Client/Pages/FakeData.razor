@@ -6,7 +6,7 @@
 
 <h2>Fake Data</h2>
 <div>
-    <DataComponent TViewModel="LoadedDataVm" TDataLoaded="Dictionary<string, string>" ViewModel="DataViewModel" Context="vm">
+    <DataComponent TViewModel="ViewModel" TDataLoaded="Dictionary<string, string>" ViewModel="DataViewModel" Context="vm">
         @switch (vm.FakeData.Count)
         {
             case 0:
@@ -30,16 +30,16 @@
     FakeDataViewModel? DataViewModel { get; set; }
     readonly CancellationTokenSource _lifetimeCts = new();
 
-    sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<LoadedDataVm, Dictionary<string, string>>(
+    sealed class FakeDataViewModel(BrowserTtlCache cache, IFakeDataService fakeDataService) : DataViewModel<ViewModel, Dictionary<string, string>>(
         dataReloadPeriod: TimeSpan.FromSeconds(5),
         cacheUsage: new(TimeSpan.FromSeconds(3), BrowserStorageType.Session, cacheKey: "FAKE_DATA"),
         cache)
     {
         public override Task<Result<Dictionary<string, string>>> LoadFreshDataAsync(CT ct) => fakeDataService.GetAllDataAsync(ct);
 
-        public override LoadedDataVm CreateViewModel(Dictionary<string, string> firstLoadedData) => new(firstLoadedData);
+        public override ViewModel CreateViewModel(Dictionary<string, string> firstLoadedData) => new(firstLoadedData);
 
-        public override void UpdateViewModel(LoadedDataVm currentViewModel, Dictionary<string, string> newData)
+        public override void UpdateViewModel(ViewModel currentViewModel, Dictionary<string, string> newData)
         {
             currentViewModel.FakeData.Clear();
             foreach (var item in newData)
@@ -47,7 +47,7 @@
         }
     }
 
-    sealed class LoadedDataVm(Dictionary<string, string> fakeData)
+    sealed class ViewModel(Dictionary<string, string> fakeData)
     {
         public Dictionary<string, string> FakeData { get; } = fakeData;
     }

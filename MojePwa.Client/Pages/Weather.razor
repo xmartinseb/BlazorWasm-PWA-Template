@@ -4,7 +4,7 @@
 @inject BrowserTtlCache BrowserTtlCache
 
 <h2>Weather</h2>
-<DataComponent TViewModel="LoadedDataVm" TDataLoaded="WeatherForecast[]" ViewModel="DataViewModel" OnViewModelUpdated="RefreshGridAsync" Context="vm">
+<DataComponent TViewModel="ViewModel" TDataLoaded="WeatherForecast[]" ViewModel="DataViewModel" OnViewModelUpdated="RefreshGridAsync" Context="vm">
     <RadzenDataGrid @ref="_weatherGrid" Data="@vm.Forecasts" TItem="WeatherForecast" AllowSorting="true">
         <Columns>
             <RadzenDataGridColumn TItem="WeatherForecast" Property="Date" Title="Date" FormatString="{0:d}" />
@@ -19,7 +19,7 @@
     WeatherDataViewModel? DataViewModel { get; set; }
     RadzenDataGrid<WeatherForecast>? _weatherGrid;
 
-    sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<LoadedDataVm, WeatherForecast[]>(
+    sealed class WeatherDataViewModel(BrowserTtlCache cache, IWeatherService weatherService) : DataViewModel<ViewModel, WeatherForecast[]>(
             dataReloadPeriod: TimeSpan.FromSeconds(2),
             cacheUsage: new(TimeSpan.FromSeconds(1), BrowserStorageType.Session, cacheKey: "WEATHER"),
             cache)
@@ -27,14 +27,14 @@
         public override Task<Result<WeatherForecast[]>> LoadFreshDataAsync(CT ct) 
             => weatherService.GetForecastAsync(ct);
 
-        public override LoadedDataVm CreateViewModel(WeatherForecast[] firstLoadedData) 
+        public override ViewModel CreateViewModel(WeatherForecast[] firstLoadedData) 
             => new(firstLoadedData.ToList());
 
-        public override void UpdateViewModel(LoadedDataVm currentViewModel, WeatherForecast[] newData)  
+        public override void UpdateViewModel(ViewModel currentViewModel, WeatherForecast[] newData)  
             => currentViewModel.Forecasts.ClearAddRange(newData);
     }
 
-    sealed record LoadedDataVm(List<WeatherForecast> Forecasts);
+    sealed record ViewModel(List<WeatherForecast> Forecasts);
 
     Task RefreshGridAsync() => _weatherGrid?.RefreshDataAsync() ?? Task.CompletedTask;
 
