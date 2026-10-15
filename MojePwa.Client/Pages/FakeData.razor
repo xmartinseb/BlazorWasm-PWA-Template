@@ -35,8 +35,7 @@
         cacheUsage: new(TimeSpan.FromSeconds(3), BrowserStorageType.Session, cacheKey: "FAKE_DATA"),
         cache)
     {
-        public override async Task<Result<Dictionary<string, string>>> LoadFreshDataAsync(CT ct)
-            => Result.Ok((await fakeDataService.GetAllDataAsync(ct)).Unwrap());
+        public override Task<Result<Dictionary<string, string>>> LoadFreshDataAsync(CT ct) => fakeDataService.GetAllDataAsync(ct);
 
         public override LoadedDataVm CreateViewModel(Dictionary<string, string> firstLoadedData) => new(firstLoadedData);
 

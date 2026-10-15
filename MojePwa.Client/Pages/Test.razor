@@ -14,7 +14,7 @@
 
 @code {
     TestApiViewModel[] DataViewModels { get; set; } = [];
-    
+
     readonly CancellationTokenSource _lifetimeCts = new();
 
     sealed class TestApiViewModel(ITestApiService testApiService) : DataViewModel<TestViewModel, string>(
@@ -22,8 +22,7 @@
         cacheUsage: null,
         browserTtlCache: null)
     {
-        public override async Task<Result<string>> LoadFreshDataAsync(CT ct)
-            => Result.Ok((await testApiService.TestApiGetAsync(ct)).Unwrap());
+        public override Task<Result<string>> LoadFreshDataAsync(CT ct) => testApiService.TestApiGetAsync(ct);
 
         public override TestViewModel CreateViewModel(string firstLoadedData) => new(firstLoadedData);
 
