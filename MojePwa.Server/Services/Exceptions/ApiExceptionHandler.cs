@@ -23,7 +23,6 @@ public sealed class ApiExceptionHandler(IProblemDetailsService problemDetailsSer
             ArgumentOutOfRangeException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is outside the permitted range"),
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", "An argument is invalid"),
             UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden", "You are not allowed to perform this operation"),
-            InvalidOperationException => (StatusCodes.Status409Conflict, "Conflict", "The request could not be completed in the current state"),
             _ => (StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred")
         };
 
