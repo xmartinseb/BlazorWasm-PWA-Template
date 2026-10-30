@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.Mvc;
 using MojePwa.Domain.Dto;
 using MojePwa.Server.Services;
 
@@ -54,4 +55,15 @@ public sealed class FakeDataController(FakeDataService fakeDbService) : Controll
         => fakeDbService.TryAdd(r.Key, r.Value)
             ? Created()
             : Conflict();
+
+
+    [HttpPatch("patch-example")]
+    public IActionResult PatchExample([FromBody] JsonPatchDocument<KeyVal> j)
+    {
+        KeyVal other = null!;
+        j.ApplyTo(other);
+        return Ok();
+    }
+
+    public record KeyVal(string Key, string Value);
 }
