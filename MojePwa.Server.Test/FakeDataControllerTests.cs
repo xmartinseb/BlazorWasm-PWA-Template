@@ -1,4 +1,4 @@
-using MojePwa.Domain.Dto;
+using MojePwa.Domain;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;

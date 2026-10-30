@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace MojePwa.Domain.Dto;
+namespace MojePwa.Domain;
 
 /// <summary>
 /// Ve fake databázi nastavuje hodnotu pro daný klíč.

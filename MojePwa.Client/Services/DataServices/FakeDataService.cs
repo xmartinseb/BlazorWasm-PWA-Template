@@ -1,4 +1,5 @@
-﻿using MojePwa.Domain.Dto;
+﻿
+using MojePwa.Domain;
 
 namespace MojePwa.Client.Services.DataServices;
 

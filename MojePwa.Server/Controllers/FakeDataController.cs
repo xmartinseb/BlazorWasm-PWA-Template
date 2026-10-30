@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
-using MojePwa.Domain.Dto;
+using MojePwa.Domain;
 using MojePwa.Server.Services;
 
 namespace MojePwa.Server.Controllers;
